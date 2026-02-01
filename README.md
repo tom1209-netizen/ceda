@@ -572,7 +572,7 @@ Magnitude = $|G_x| + |G_y|$
 
 Gradient direction is quantized to 8 directions ($0^\circ$, $22.5^\circ$, $45^\circ$, ..., $157.5^\circ$) using a **comparison-based approach** that avoids expensive $\arctan$ computation:
 
-$\theta = f\left( \frac{\lvert G_y \rvert}{\lvert G_x \rvert}, \operatorname{sign}(G_x), \operatorname{sign}(G_y) \right)$
+$\theta = f\left( \frac{\lvert G_y \rvert}{\lvert G_x \rvert}, \text{sign}(G_x), \text{sign}(G_y) \right)$
 
 |   Direction Bin   | Angle Range                   | Condition                                                                               |
 | :---------------: | :---------------------------- | :-------------------------------------------------------------------------------------- |
