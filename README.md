@@ -143,24 +143,24 @@ The following diagram shows how stages overlap in time. Each stage starts as soo
 gantt
     dateFormat X
     axisFormat %s
-    
+
     %% Line width = 1920 pixels
     %% 1 Line = 1920
     %% 2 Lines = 3840
     %% 3 Lines = 5760
     %% 4 Lines = 7680
-    
+
     section Gaussian
     Running (Starts @ 0)         :active, g, 0, 9600
-    
+
     section Sobel
     Wait (2 Lines)               :done, s_wait, 0, 3840
     Running (Starts @ 3840)      :active, s, after s_wait, 9600
-    
+
     section NMS
     Wait (3 Lines)               :done, n_wait, 0, 5760
     Running (Starts @ 5760)      :active, n, after n_wait, 9600
-    
+
     section Threshold
     Wait (4 Lines)               :done, t_wait, 0, 7680
     Running (Starts @ 7680)      :active, t, after t_wait, 9600
@@ -213,7 +213,7 @@ When the 5×5 window is centered at column 1, columns -1 and 0 are outside the f
 
 | Col -2 | Col -1 | Col 0 | Col 1 | Col 2 |
 | :----: | :----: | :---: | :---: | :---: |
-| A      | A      | A     | B     | C     |
+|   A    |   A    |   A   |   B   |   C   |
 
 Column 0 value (`A`) is replicated for out-of-bounds positions.
 
@@ -223,11 +223,11 @@ When the 5×5 window is centered at row 1, rows -1 and 0 are outside the frame:
 
 | Row | Pixel Value |
 | :-: | :---------: |
-| -2  | P           |
-| -1  | P           |
-| 0   | P           |
-| 1   | Q           |
-| 2   | R           |
+| -2  |      P      |
+| -1  |      P      |
+|  0  |      P      |
+|  1  |      Q      |
+|  2  |      R      |
 
 Row 0 value (`P`) is replicated for out-of-bounds positions.
 
@@ -237,20 +237,20 @@ At pixel (0, 0), both horizontal and vertical replication apply:
 
 |        | Col -2 | Col -1 | Col 0 | Col 1 | Col 2 |
 | :----: | :----: | :----: | :---: | :---: | :---: |
-| Row -2 | A      | A      | A     | B     | C     |
-| Row -1 | A      | A      | A     | B     | C     |
-| Row 0  | A      | A      | A     | B     | C     |
-| Row 1  | D      | D      | D     | E     | F     |
-| Row 2  | G      | G      | G     | H     | I     |
+| Row -2 |   A    |   A    |   A   |   B   |   C   |
+| Row -1 |   A    |   A    |   A   |   B   |   C   |
+| Row 0  |   A    |   A    |   A   |   B   |   C   |
+| Row 1  |   D    |   D    |   D   |   E   |   F   |
+| Row 2  |   G    |   G    |   G   |   H   |   I   |
 
 #### Replication Rules Summary
 
-| Boundary              | Condition    | Replication Rule           |
-| --------------------- | ------------ | -------------------------- |
-| Left edge             | x < 2        | `pixel[0, y]` replicated   |
-| Right edge            | x > W-3      | `pixel[W-1, y]` replicated |
-| Top edge              | y < 2        | `pixel[x, 0]` replicated   |
-| Bottom edge           | y > H-3      | `pixel[x, H-1]` replicated |
+| Boundary    | Condition | Replication Rule           |
+| ----------- | --------- | -------------------------- |
+| Left edge   | x < 2     | `pixel[0, y]` replicated   |
+| Right edge  | x > W-3   | `pixel[W-1, y]` replicated |
+| Top edge    | y < 2     | `pixel[x, 0]` replicated   |
+| Bottom edge | y > H-3   | `pixel[x, H-1]` replicated |
 
 > [!IMPORTANT]
 > Output frame size remains **1920×1080** — identical to input. No cropping occurs.
@@ -282,11 +282,11 @@ flowchart LR
     S_TLAST --> SHIFT --> M_TLAST
 ```
 
-| Signal     | Delay                 | Notes                                  |
-| ---------- | --------------------- | -------------------------------------- |
-| `m_tuser`  | 4 lines + 12 cycles   | Aligns with first valid edge pixel     |
-| `m_tlast`  | 4 lines + 12 cycles   | Marks end of corresponding output line |
-| `m_tvalid` | 4 lines + 12 cycles   | Follows input `s_tvalid` pattern       |
+| Signal     | Delay               | Notes                                  |
+| ---------- | ------------------- | -------------------------------------- |
+| `m_tuser`  | 4 lines + 12 cycles | Aligns with first valid edge pixel     |
+| `m_tlast`  | 4 lines + 12 cycles | Marks end of corresponding output line |
+| `m_tvalid` | 4 lines + 12 cycles | Follows input `s_tvalid` pattern       |
 
 > [!NOTE]
 > The delay matches the total pipeline latency, ensuring downstream blocks receive a well-formed AXI-Stream with correctly aligned control signals.
@@ -300,7 +300,7 @@ flowchart LR
     MREADY["m_tready"] --> AND{{"AND"}}
     SVALID["s_tvalid"] --> AND
     AND --> EN["pipeline_enable"]
-    
+
     EN --> GAUSS["Gaussian
     (frozen)"]
     EN --> SOBEL["Sobel
@@ -583,7 +583,7 @@ $\theta = f\left( \frac{\lvert G_y \rvert}{\lvert G_x \rvert}, \text{sign}(G_x),
 
 **Hardware Implementation** (shift-add only, no multipliers):
 
-$\text{thresh}_{\text{low}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 4) \approx 0.375 \times \lvert G_x \rvert$
+$\text{thresh}_{\text{low}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 5) \approx 0.375 \times \lvert G_x \rvert$
 
 | Output | Direction | Used for NMS comparison |
 | ------ | --------- | ----------------------- |
@@ -646,7 +646,7 @@ flowchart TB
     MB0 & MB1 & MB2 --> W
     DIR --> DREG --> MUX
     W --> MUX --> CMP --> SUP --> OUT
-````
+```
 
 ### Specifications
 
