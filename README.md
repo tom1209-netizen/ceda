@@ -583,7 +583,7 @@ $\theta = f\left( \frac{\lvert G_y \rvert}{\lvert G_x \rvert}, \text{sign}(G_x),
 
 **Hardware Implementation** (shift-add only, no multipliers):
 
-$\text{thresh}_{\text{low}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 5) \approx 0.375 \times \lvert G_x \rvert$
+$\text{thresh}_{\text{low}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 3) \approx 0.375 \times \lvert G_x \rvert$
 
 | Output | Direction | Used for NMS comparison |
 | ------ | --------- | ----------------------- |
