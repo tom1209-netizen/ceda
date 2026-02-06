@@ -8,6 +8,7 @@ TOPLEVEL_LANG ?= verilog
 RTL_DIR := ../../hw/rtl
 COMMON_DIR := $(RTL_DIR)/common
 GAUSSIAN_DIR := $(RTL_DIR)/gaussian
+NMS_DIR := $(RTL_DIR)/nms
 INC_DIR := $(RTL_DIR)/inc
 
 # Python test path
@@ -123,7 +124,6 @@ test_gaussian_stage:
 		COCOTB_TEST_MODULES=tests.test_gaussian_stage \
 		COMPILE_ARGS="-Pgaussian_stage.IMG_WIDTH=32 -Pgaussian_stage.IMG_HEIGHT=32"
 
-# 1080p real-image test (uses dv/cocotb/tests/test_output/input_pattern.png)
 .PHONY: test_gaussian_stage_1080p
 test_gaussian_stage_1080p:
 	$(CLEAN_CMD)
@@ -137,13 +137,23 @@ test_gaussian_stage_1080p:
 		COCOTB_TEST_MODULES=tests.test_gaussian_real_image \
 		COMPILE_ARGS="-Pgaussian_stage.IMG_WIDTH=1920 -Pgaussian_stage.IMG_HEIGHT=1080"
 
+.PHONY: test_nms
+test_nms:
+	$(CLEAN_CMD)
+	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
+		SIM=$(SIM) \
+		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
+        VERILOG_SOURCES="$(COMMON_DIR)/line_buffer.v $(NMS_DIR)/row_buffer_3.v $(NMS_DIR)/nms_core.v $(NMS_DIR)/nms_stage.v" \
+        TOPLEVEL=nms_stage \
+        COCOTB_TEST_MODULES=tests.test_nms \
+        COMPILE_ARGS="-Pnms_stage.IMG_WIDTH=20"
+
 # Clean
 .PHONY: clean
 clean:
 	rm -rf sim_build results.xml __pycache__ tests/__pycache__ models/__pycache__
 	rm -rf *.vcd *.fst
 
-# Help
 .PHONY: help
 help:
 	@echo "CEDA Cocotb Test Targets:"

@@ -4,3 +4,5 @@ __pycache__
 # Simulation junk
 transcript
 vsim.wlf
+dv/cocotb/sim_build/
+dv/cocotb/results.xml
