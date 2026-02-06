@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1770359082" />
+    <testcase name="test_gaussian_stage_real_image_1080p" classname="tests.test_gaussian_real_image" file="/home/tom/Documents/ceda/dv/cocotb/tests/test_gaussian_real_image.py" lineno="135" time="221.77848601341248" sim_time_ns="20736030.0" ratio_time="93498.8346829365" />
+  </testsuite>
+</testsuites>

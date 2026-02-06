@@ -1,0 +1,46 @@
+rm -rf sim_build results.xml
+make -f /home/tom/.pyenv/versions/3.10.18/lib/python3.10/site-packages/cocotb_tools/makefiles/Makefile.sim \
+	SIM=icarus \
+	TOPLEVEL_LANG=verilog \
+	VERILOG_SOURCES="../../hw/rtl/common/pe.v ../../hw/rtl/common/line_buffer.v \
+	                 ../../hw/rtl/gaussian/window_5x5.v ../../hw/rtl/gaussian/gaussian_5x5_core.v \
+	                 ../../hw/rtl/gaussian/gaussian_stage.v" \
+	TOPLEVEL=gaussian_stage \
+	COCOTB_TEST_MODULES=tests.test_gaussian_stage \
+	COMPILE_ARGS="-Pgaussian_stage.IMG_WIDTH=1920 -Pgaussian_stage.IMG_HEIGHT=1080"
+make[1]: Entering directory '/home/tom/Documents/ceda/dv/cocotb'
+rm -f results.xml
+"make" -f /home/tom/.pyenv/versions/3.10.18/lib/python3.10/site-packages/cocotb_tools/makefiles/Makefile.sim results.xml
+make[2]: Entering directory '/home/tom/Documents/ceda/dv/cocotb'
+mkdir -p sim_build
+/usr/bin/iverilog -o sim_build/sim.vvp -s gaussian_stage -g2012 -Pgaussian_stage.IMG_WIDTH=1920 -Pgaussian_stage.IMG_HEIGHT=1080  ../../hw/rtl/common/pe.v ../../hw/rtl/common/line_buffer.v 	                 ../../hw/rtl/gaussian/window_5x5.v ../../hw/rtl/gaussian/gaussian_5x5_core.v 	                 ../../hw/rtl/gaussian/gaussian_stage.v
+rm -f results.xml
+COCOTB_TEST_MODULES=tests.test_gaussian_stage COCOTB_TESTCASE= COCOTB_TEST_FILTER= COCOTB_TOPLEVEL=gaussian_stage TOPLEVEL_LANG=verilog \
+         /usr/bin/vvp -M /home/tom/.pyenv/versions/3.10.18/lib/python3.10/site-packages/cocotb/libs -m libcocotbvpi_icarus   sim_build/sim.vvp   
+     -.--ns INFO     gpi                                ..mbed/gpi_embed.cpp:93   in _embed_init_python              Using Python 3.10.14 interpreter at /home/tom/.pyenv/versions/3.10.18/bin/python3.10
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:79   in gpi_print_registered_impl       VPI registered
+     0.00ns INFO     cocotb                             Running on Icarus Verilog version 12.0 (stable)
+     0.00ns INFO     cocotb                             Seeding Python random module with 1770208312
+     0.00ns INFO     cocotb                             Initialized cocotb v2.0.1 from /home/tom/.pyenv/versions/3.10.18/lib/python3.10/site-packages/cocotb
+     0.00ns INFO     cocotb                             Running tests
+     0.00ns INFO     cocotb.regression                  running tests.test_gaussian_stage.test_gaussian_stage_reset (1/5)
+                                                            Test reset state
+    20.00ns INFO     cocotb.regression                  tests.test_gaussian_stage.test_gaussian_stage_reset passed
+    20.00ns INFO     cocotb.regression                  running tests.test_gaussian_stage.test_gaussian_stage_valid_timing (2/5)
+                                                            Test that valid signal asserts after correct fill latency
+ 38561.00ns INFO     cocotb.gaussian_stage              First valid at cycle 3851, expected ~3845
+ 38561.00ns INFO     cocotb.regression                  tests.test_gaussian_stage.test_gaussian_stage_valid_timing passed
+ 38561.00ns INFO     cocotb.regression                  running tests.test_gaussian_stage.test_gaussian_stage_backpressure (3/5)
+                                                            Test backpressure handling (m_tready = 0)
+ 38822.00ns INFO     cocotb.regression                  tests.test_gaussian_stage.test_gaussian_stage_backpressure passed
+ 38822.00ns INFO     cocotb.regression                  running tests.test_gaussian_stage.test_gaussian_stage_small_frame (4/5)
+                                                            Test with a small frame (requires small IMG_WIDTH/HEIGHT for test)
+** VVP Stop(0) **
+** Flushing output streams.
+** Current simulation time is 137293 ticks.
+> 
+> [K> ^C^C[K> ls -la /home/tom/Documents/ceda/dv/cocotb/test_images/
+2 items in this scope:
+package : $unit
+module  : gaussian_stage
+> [K> [K> [K> ^C
