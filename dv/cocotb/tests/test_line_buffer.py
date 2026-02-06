@@ -23,12 +23,8 @@ async def test_line_buffer_delay(dut):
     
     line_width = int(dut.LINE_WIDTH.value)
     
-    # The registered output means:
-    # - At posedge N: we drive data_in[N] and sample data_out which contains data from cycle N-LINE_WIDTH-1 
-    # - Actually: output[N] = input[N - LINE_WIDTH]
-    # Since we sample AFTER the clock edge in same iteration, we get the "old" value
-    # Let me be more careful: we sample received_data[i] after driving test_data[i]
-    # Due to registered output: received_data[i] = test_data[i - line_width - 1]
+    # Registered output: output[N] = input[N - LINE_WIDTH]
+    # We sample after driving, so actually received_data[i] = test_data[i - line_width - 1]
     
     test_data = []
     received_data = []
@@ -49,12 +45,7 @@ async def test_line_buffer_delay(dut):
         except ValueError:
             received_data.append(-1)
     
-    # Verify delay: received_data[i] should equal test_data[i - line_width]
-    # But there's a 1-cycle offset because we sample after driving
-    # So: received_data[i] = test_data[i - line_width]?
-    # From error: at cycle 64, expected 33 (test_data[32]=33), got 32 (test_data[31]=32)
-    # So actual: received_data[64] = test_data[31] = test_data[64 - 32 - 1]
-    # Therefore: the delay is LINE_WIDTH + 1 due to output register timing
+    # Verify delay: actual delay is LINE_WIDTH + 1 due to output register timing
     actual_delay = line_width + 1
     
     errors = 0

@@ -39,31 +39,8 @@ async def test_row_buffer_basic(dut):
             await RisingEdge(dut.clk)
             
             # Check outputs
-            # row_4 should equal input (pixel_val) immediately (assuming 0 delay from input to row_4, but check RTL)
-            # RTL: assign row_4 = row_delay[4][3]; row_delay[4][0]<=input. Wait, logic trace:
-            # lb_out[4] = input.
-            # row_delay[4][0] <= lb_out[4] = input.
-            # row_delay[4][1] <= [0]
-            # row_delay[4][2] <= [1]
-            # row_delay[4][3] <= [2]
-            # row_4 = [3].
-            # So row_4 is delayed by 4 clock cycles relative to input.
-            
-            # row_0 is from lb_out[0].
-            # lb_out[4] (input) -> LB3 -> lb_out[3] -> LB2 -> lb_out[2] -> LB1 -> lb_out[1] -> LB0 -> lb_out[0].
-            # Each LB adds 'width' delay? No, LB reads then writes.
-            # line_buffer: data_out <= buffer[addr]; buffer[addr] <= data_in; addr++.
-            # So delay is exactly 'width' cycles if addr starts at 0.
-            
-            # Since we have Per-Row Delays (`row_delay`), all rows should be ALIGNED.
-            # This means `row_0` at time T should be the same column as `row_4` at time T.
-            # But `row_0` is from 4 lines ago.
-            # So if input is Line N, Col C.
-            # row_4 should output Line N, Col C (delayed by alignment latency).
-            # row_0 should output Line N-4, Col C (delayed by same alignment latency).
-            
-            # The alignment latency is MAX_ROW_DELAY = 4 cycles.
-            # So verify: output at T corresponds to input at T-4.
+            # row_4 is delayed by 4 clock cycles relative to input (alignment latency)
+            # row_0 is delayed by same latency relative to its line start (input at T-4 lines).
             pass
 
     # Basic verification logic:
@@ -101,15 +78,10 @@ async def test_row_buffer_verify_content(dut):
             await RisingEdge(dut.clk)
             
             # Check outputs after latency
-            # At cycle (l_idx * width + c_idx) + 1 (next EDGE), signals are updated.
-            # But we are AT the RisingEdge. The signals reflect state from PREVIOUS edge.
-            # row_4 should correspond to value driven 4 cycles ago?
-            
-            # Ideally, capture expected inputs in a FIFO and compare outputs.
             pass
 
-    # Let's use a simpler check:
-    # After feeding Line 5 complete.
+    # Verification logic:
+    # After feeding Line 5 complete:
     # row_4 should output Line 5.
     # row_3 should output Line 4.
     # ...
@@ -131,7 +103,7 @@ async def test_row_buffer_verify_content(dut):
             # Capture outputs
             # Valid data starts appearing after initial fill.
             # Due to 4 cycle alignment delay, we expect valid data for col 0 at cycle 4.
-            # But we just simplify: capture everything, align later.
+            # Capture everything, align later.
             received_rows[0].append(int(dut.row_0.value))
             received_rows[1].append(int(dut.row_1.value))
             received_rows[2].append(int(dut.row_2.value))
@@ -162,10 +134,6 @@ async def test_row_buffer_verify_content(dut):
         for l in expected_lines:
             expected_stream.extend(l)
             
-        # Check alignment
-        # Search for first 10 pixels of expected in actual
-        # or simplified: actual[delay] == expected[0]
-        
         subset = actual[delay_cycles : delay_cycles + len(expected_stream)]
         if len(subset) < len(expected_stream):
              dut._log.error(f"{name}: Not enough data. Got {len(subset)}, want {len(expected_stream)}")

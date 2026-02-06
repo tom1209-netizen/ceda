@@ -1,6 +1,9 @@
 <testsuites name="results">
   <testsuite name="all" package="all">
-    <property name="random_seed" value="1770359082" />
-    <testcase name="test_gaussian_stage_real_image_1080p" classname="tests.test_gaussian_real_image" file="/home/tom/Documents/ceda/dv/cocotb/tests/test_gaussian_real_image.py" lineno="135" time="221.77848601341248" sim_time_ns="20736030.0" ratio_time="93498.8346829365" />
+    <property name="random_seed" value="1770363679" />
+    <testcase name="test_gaussian_stage_reset" classname="tests.test_gaussian_stage" file="/home/tom/Documents/ceda/dv/cocotb/tests/test_gaussian_stage.py" lineno="55" time="0.0010254383087158203" sim_time_ns="20.0" ratio_time="19503.854917461056" />
+    <testcase name="test_gaussian_stage_valid_timing" classname="tests.test_gaussian_stage" file="/home/tom/Documents/ceda/dv/cocotb/tests/test_gaussian_stage.py" lineno="67" time="0.009102582931518555" sim_time_ns="800.0" ratio_time="87887.14214620602" />
+    <testcase name="test_gaussian_stage_backpressure" classname="tests.test_gaussian_stage" file="/home/tom/Documents/ceda/dv/cocotb/tests/test_gaussian_stage.py" lineno="104" time="0.0019617080688476562" sim_time_ns="260.0" ratio_time="132537.5595527467" />
+    <testcase name="test_gaussian_stage_small_frame" classname="tests.test_gaussian_stage" file="/home/tom/Documents/ceda/dv/cocotb/tests/test_gaussian_stage.py" lineno="137" time="0.04183840751647949" sim_time_ns="3230.0" ratio_time="77201.7911706547" />
   </testsuite>
 </testsuites>
