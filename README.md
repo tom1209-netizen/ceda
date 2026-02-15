@@ -574,17 +574,22 @@ Gradient direction is quantized to 8 directions ($0^\circ$, $22.5^\circ$, $45^\c
 
 $\theta = f\left( \frac{\lvert G_y \rvert}{\lvert G_x \rvert}, \text{sign}(G_x), \text{sign}(G_y) \right)$
 
-|   Direction Bin   | Angle Range                   | Condition                                                                               |
-| :---------------: | :---------------------------- | :-------------------------------------------------------------------------------------- |
-| 0 $(\rightarrow)$ | $-22.5^\circ$ to $22.5^\circ$ | $\lvert G_y \rvert < 0.375 \times \lvert G_x \rvert$                                    |
-|  1 $(\nearrow)$   | $22.5^\circ$ to $67.5^\circ$  | $0.375 \times \lvert G_x \rvert \leq \lvert G_y \rvert < 2.25 \times \lvert G_x \rvert$ |
-|  2 $(\uparrow)$   | $67.5^\circ$ to $112.5^\circ$ | $\lvert G_y \rvert \geq 2.25 \times \lvert G_x \rvert$                                  |
-|        3–7        | (mirrored symmetries)         | Mirror 0–2 using signs of $G_x, G_y$                                                    |
+| **Direction Bin**     | **Angle Range**                                | **Condition**                                                                                               |
+| --------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **0** $(\rightarrow)$ | $-22.5^\circ \leq \text{dir} \leq 22.5^\circ$  | $G_x > 0$, $\lvert G_y \rvert \leq 0.414 \times \lvert G_x \rvert$                                          |
+| **1** $(\nearrow)$    | $22.5^\circ < \text{dir} < 67.5^\circ$         | $G_x > 0$, $G_y > 0$, $0.414 \times \lvert G_x \rvert < \lvert G_y \rvert < 2.414 \times \lvert G_x \rvert$ |
+| **2** $(\uparrow)$    | $67.5^\circ \leq \text{dir} \leq 112.5^\circ$  | $G_y > 0$, $G_y \geq 2.414 \times \lvert G_x \rvert$                                                        |
+| **3** $(\nwarrow)$    | $112.5^\circ < \text{dir} < 157.5^\circ$       | $G_x < 0$, $G_y > 0$, $0.414 \times \lvert G_x \rvert < \lvert G_y \rvert < 2.414 \times \lvert G_x \rvert$ |
+| **4** $(\leftarrow)$  | $157.5^\circ \leq \text{dir} \leq 202.5^\circ$ | $G_x < 0$, $\lvert G_y \rvert \leq 0.414 \times \lvert G_x \rvert$                                          |
+| **5** $(\swarrow)$    | $202.5^\circ < \text{dir} < 247.5^\circ$       | $G_x < 0$, $G_y < 0$, $0.414 \times \lvert G_x \rvert < \lvert G_y \rvert < 2.414 \times \lvert G_x \rvert$ |
+| **6** $(\downarrow)$  | $247.5^\circ \leq \text{dir} \leq 292.5^\circ$ | $G_y < 0$, $\lvert G_y \rvert \geq 2.414 \times \lvert G_x \rvert$                                          |
+| **7** $(\searrow)$    | $292.5^\circ < \text{dir} < 337.5^\circ$       | $G_y < 0$, $G_x > 0$, $0.414 \times \lvert G_x \rvert < \lvert G_y \rvert < 2.414 \times \lvert G_x \rvert$ |
+
 
 **Hardware Implementation** (shift-add only, no multipliers):
 
-$\text{thresh}_{\text{low}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 3) \approx 0.375 \times \lvert G_x \rvert$
-$\text{thresh}_{\text{high}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 3) + (\lvert G_x \rvert \ll 1) \approx 2.375 \times \lvert G_x \rvert$
+$$\text{thresh}_{\text{low}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 3) + (\lvert G_x \rvert \gg 5) \approx 0.40625 \times \lvert G_x \rvert$$
+$$\text{thresh}_{\text{high}} = \text{thresh}_{\text{low}} + (\lvert G_x \rvert \ll 1) \approx 2.40625 \times \lvert G_x \rvert$$
 
 
 | Output | Direction | Used for NMS comparison |
@@ -597,6 +602,7 @@ $\text{thresh}_{\text{high}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \g
 | 3'b101 | 112.5°    | Compare NW-SE           |
 | 3'b110 | 135°      | Compare NW-SE           |
 | 3'b111 | 157.5°    | Compare East-West       |
+
 
 ## 5. Non-Maximum Suppression (NMS) Stage
 

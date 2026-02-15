@@ -242,8 +242,11 @@ module sobel_stage #(
     wire signed [11:0] combined_magnitude = abs_sum_gx + abs_sum_gy;
     
     // Gradient Direction Logic
-    wire signed [15:0] gx_thresh_low  = (abs_sum_gx >>> 2) + (abs_sum_gx >>> 3); // Approx 0.375 * |gx|
-    wire signed [15:0] gx_thresh_high = (abs_sum_gx <<< 1) + (abs_sum_gx >>> 2) + (abs_sum_gx >>> 3); // Approx 2.375 * |gx|
+    // Approximation: 1/4 + 1/8 + 1/32 = 0.40625 (close to 0.414)
+    wire signed [15:0] gx_thresh_low  = (abs_sum_gx >>> 2) + (abs_sum_gx >>> 3) + (abs_sum_gx >>> 5); 
+    
+    wire signed [15:0] gx_thresh_high = (abs_sum_gx <<< 1) + gx_thresh_low; 
+    
     reg [2:0] gradient_direction;
     
     always @(*) begin
@@ -273,7 +276,7 @@ module sobel_stage #(
                 // Quadrant 2 (gy >= 0)
                 if (abs_sum_gy <= gx_thresh_low) 
                     gradient_direction = 3'd4;       // 157.5 to 202.5
-                else if (abs_sum_gy <= gx_thresh_high) 
+                else if (abs_sum_gy < gx_thresh_high) 
                     gradient_direction = 3'd3;       // 112.5 to 157.5
                 else 
                     gradient_direction = 3'd2;       // 67.5 to 112.5
