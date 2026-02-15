@@ -538,7 +538,7 @@ flowchart TB
 
 ```math
 \begin{bmatrix}
--1 & 0 & -1 \\
+-1 & 0 & 1 \\
  -2 &  0 &  2 \\
  -1 &  0 &  1
 \end{bmatrix}
@@ -548,7 +548,7 @@ flowchart TB
 
 ```math
 \begin{bmatrix}
--1 & -2 & -1 \\
+-1 & -2 &  1 \\
  0 &  0 &  0 \\
  1 &  2 &  1
 \end{bmatrix}
@@ -584,6 +584,8 @@ $\theta = f\left( \frac{\lvert G_y \rvert}{\lvert G_x \rvert}, \text{sign}(G_x),
 **Hardware Implementation** (shift-add only, no multipliers):
 
 $\text{thresh}_{\text{low}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 3) \approx 0.375 \times \lvert G_x \rvert$
+$\text{thresh}_{\text{high}} = (\lvert G_x \rvert \gg 2) + (\lvert G_x \rvert \gg 3) + (\lvert G_x \rvert \ll 1) \approx 2.375 \times \lvert G_x \rvert$
+
 
 | Output | Direction | Used for NMS comparison |
 | ------ | --------- | ----------------------- |

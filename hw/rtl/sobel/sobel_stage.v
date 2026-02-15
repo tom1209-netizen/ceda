@@ -9,6 +9,7 @@ module sobel_stage #(
     input  wire [7:0]     s_axis_tdata,
     input  wire           s_axis_tvalid,
     output wire           s_axis_tready,
+    input  wire           s_axis_tlast,
     
     // Outputs
     output reg [14:0]     m_axis_tdata,
