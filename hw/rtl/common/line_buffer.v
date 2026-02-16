@@ -16,6 +16,14 @@ module line_buffer #(
     // BRAM storage - inferred as block RAM by synthesis tool
     reg [DATA_WIDTH-1:0] buffer[0:LINE_WIDTH-1];
 
+    // Initialize buffer to zero 
+    integer i;
+    initial begin
+        for (i = 0; i < LINE_WIDTH; i = i + 1) begin
+            buffer[i] = {DATA_WIDTH{1'b0}};
+        end
+    end
+
     // Address counter for circular buffer
     reg [ADDR_WIDTH-1:0] addr;
 
