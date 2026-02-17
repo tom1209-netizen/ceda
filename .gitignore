@@ -6,3 +6,6 @@ transcript
 vsim.wlf
 dv/cocotb/sim_build/
 dv/cocotb/results.xml
+dv/cocotb/transcript
+dv/cocotb/vsim.wlf
+dv/cocotb/waveform.json

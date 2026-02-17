@@ -13,6 +13,7 @@ async def reset_dut(dut):
     """Apply reset to DUT"""
     dut.rst_n.value = 0
     dut.enable.value = 0
+    dut.valid_in.value = 0
     dut.win_row_0.value = 0
     dut.win_row_1.value = 0
     dut.win_row_2.value = 0
@@ -39,6 +40,7 @@ async def test_gaussian_streaming(dut):
     
     await reset_dut(dut)
     dut.enable.value = 1
+    dut.valid_in.value = 1
     
     # Generate random image strip: 5 rows x N columns
     # We verify the output by taking sliding 5x5 windows of this strip
@@ -112,6 +114,7 @@ async def test_impulse(dut):
     cocotb.start_soon(clock.start())
     await reset_dut(dut)
     dut.enable.value = 1
+    dut.valid_in.value = 1
     
     # Create impulse sequence logic
     # K matrix center is at [2][2] (using 0-based indices) with Coeff 36.
@@ -132,4 +135,3 @@ async def test_impulse(dut):
             actual_outputs.append(int(dut.pixel_out.value))
             
     assert 36 in actual_outputs, f"Impulse response 36 not found in {actual_outputs}"
-

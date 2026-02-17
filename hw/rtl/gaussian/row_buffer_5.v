@@ -18,9 +18,22 @@ module row_buffer_5 #(
     output wire [DATA_WIDTH-1:0] row_3,
     output wire [DATA_WIDTH-1:0] row_4
 );
+    // =========================================================================
+    // Configuration
+    // =========================================================================
     localparam int ROWS = 5;
     localparam int MAX_ROW_DELAY = ROWS - 1;  // 4
 
+    // =========================================================================
+    // Control Path
+    // =========================================================================
+    // Single global enable gates both the line-buffer chain and delay alignment
+    // registers so row timing remains coherent under stalls.
+    wire lb_enable = enable;
+
+    // =========================================================================
+    // Datapath: Line Buffer Chain
+    // =========================================================================
     // Line buffer outputs (delayed rows)
     wire [DATA_WIDTH-1:0] lb_out[0:ROWS-1];
     assign lb_out[4] = pixel_in;
@@ -39,7 +52,7 @@ module row_buffer_5 #(
     ) u_lb3 (
         .clk(clk),
         .rst_n(rst_n),
-        .enable(enable),
+        .enable(lb_enable),
         .data_in(lb_out[4]),
         .data_out(lb_out[3])
     );
@@ -50,7 +63,7 @@ module row_buffer_5 #(
     ) u_lb2 (
         .clk(clk),
         .rst_n(rst_n),
-        .enable(enable),
+        .enable(lb_enable),
         .data_in(lb_out[3]),
         .data_out(lb_out[2])
     );
@@ -61,7 +74,7 @@ module row_buffer_5 #(
     ) u_lb1 (
         .clk(clk),
         .rst_n(rst_n),
-        .enable(enable),
+        .enable(lb_enable),
         .data_in(lb_out[2]),
         .data_out(lb_out[1])
     );
@@ -72,13 +85,16 @@ module row_buffer_5 #(
     ) u_lb0 (
         .clk(clk),
         .rst_n(rst_n),
-        .enable(enable),
+        .enable(lb_enable),
         .data_in(lb_out[1]),
         .data_out(lb_out[0])
     );
 
-    // The chained line buffers are registered ("Read-first" BRAM behavior in line_buffer.v), 
-    // which introduces an extra cycle of latnecy per row relative to the previous one.
+    // =========================================================================
+    // Datapath: Per-Row Delay Alignment
+    // =========================================================================
+    // The chained line buffers are registered ("Read-first" BRAM behavior in line_buffer.v),
+    // which introduces an extra cycle of latency per row relative to the previous one.
     // Compensate with per-row delay pipelines so all rows are horizontally aligned.
     // Row 4 (Input): No delay from LB. Needs 4 cycles to align with Row 0.
     // Row 3 (LB3): 1 cycle delay from LB. Needs 3 cycles.
@@ -94,7 +110,7 @@ module row_buffer_5 #(
                     row_delay[rr][dd] <= {DATA_WIDTH{1'b0}};
                 end
             end
-        end else if (enable) begin
+        end else if (lb_enable) begin
             for (rr = 1; rr < ROWS; rr = rr + 1) begin
                 // Input to delay line is the LB output
                 row_delay[rr][0] <= lb_out[rr];
@@ -105,8 +121,11 @@ module row_buffer_5 #(
         end
     end
 
+    // =========================================================================
+    // Output Mapping
+    // =========================================================================
     // Assign aligned outputs
-    // row_0 comes from lb_out[0], which is already delayed by 4 LB cycles (horizontal latency). 
+    // row_0 comes from lb_out[0], which is already delayed by 4 LB cycles (horizontal latency).
     // So it needs 0 extra delays.
     assign row_0 = lb_out[0];
 

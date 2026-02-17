@@ -6,6 +6,7 @@ module gaussian_5x5_core #(
     input wire clk,
     input wire rst_n,
     input wire enable,
+    input wire valid_in,
 
     // Only column 0 of each row is needed for the Sequential PE architecture.
     // The streaming nature (1 pixel/clk) means PE stage 'k' (at time t+k) naturally sees
@@ -19,6 +20,9 @@ module gaussian_5x5_core #(
     output reg [PIXEL_WIDTH-1:0] pixel_out,
     output reg                   valid_out
 );
+    // =========================================================================
+    // Configuration
+    // =========================================================================
     localparam int ROWS = 5;
     localparam int COLS = 5;
 
@@ -26,6 +30,15 @@ module gaussian_5x5_core #(
     // - 5 registered PE stages per row + 1 output register = 6 cycles.
     localparam int OUT_LATENCY = COLS + 1;  // 6
 
+    // =========================================================================
+    // Control Path
+    // =========================================================================
+    reg [OUT_LATENCY-1:0] valid_pipe;
+    wire [OUT_LATENCY-1:0] valid_next = {valid_pipe[OUT_LATENCY-2 : 0], valid_in};
+
+    // =========================================================================
+    // Datapath
+    // =========================================================================
     // Map inputs to a readable array for the generate loop
     wire [PIXEL_WIDTH-1:0] win_row[0:ROWS-1];
     assign win_row[0] = win_row_0;
@@ -115,19 +128,24 @@ module gaussian_5x5_core #(
     wire [ACCUM_WIDTH-1:0] sum_rounded = sum + {{(ACCUM_WIDTH - 8) {1'b0}}, 8'd128};
     wire [PIXEL_WIDTH-1:0] normalized = sum_rounded[PIXEL_WIDTH+7 : 8];
 
-    reg [OUT_LATENCY-1:0] valid_pipe;
-    wire [OUT_LATENCY-1:0] valid_next = {valid_pipe[OUT_LATENCY-2 : 0], 1'b1};
-
+    // Datapath register
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            pixel_out  <= {PIXEL_WIDTH{1'b0}};
+            pixel_out <= {PIXEL_WIDTH{1'b0}};
+        end else if (enable) begin
+            // Output register adds 1 cycle beyond the PE chain.
+            pixel_out <= normalized;
+        end
+    end
+
+    // Control-path valid alignment
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             valid_out  <= 1'b0;
             valid_pipe <= {OUT_LATENCY{1'b0}};
         end else if (enable) begin
-            // Output register adds 1 cycle beyond the PE chain; valid is delayed to match.
-            pixel_out  <= normalized;
             valid_pipe <= valid_next;
-            valid_out  <= valid_next[OUT_LATENCY-1];
+            valid_out  <= valid_next[OUT_LATENCY-1];  // valid_in delayed to match pixel_out
         end
     end
 endmodule

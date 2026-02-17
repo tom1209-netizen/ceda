@@ -1,8 +1,9 @@
 SHELL := /bin/bash
 
 # Simulator configuration
-SIM ?= icarus
+SIM ?= modelsim
 TOPLEVEL_LANG ?= verilog
+TESTCASE ?= test_gaussian_stage_small_frame
 
 # Project paths
 RTL_DIR := ../../hw/rtl
@@ -122,7 +123,8 @@ test_gaussian_stage:
 		                 $(GAUSSIAN_DIR)/gaussian_stage.v" \
 		TOPLEVEL=gaussian_stage \
 		COCOTB_TEST_MODULES=tests.test_gaussian_stage \
-		COMPILE_ARGS="-Pgaussian_stage.IMG_WIDTH=32 -Pgaussian_stage.IMG_HEIGHT=32"
+		COCOTB_TESTCASE=$(TESTCASE) \
+		SIM_ARGS="-GIMG_WIDTH=5 -GIMG_HEIGHT=5"
 
 .PHONY: test_gaussian_stage_1080p
 test_gaussian_stage_1080p:
@@ -135,7 +137,7 @@ test_gaussian_stage_1080p:
 		                 $(GAUSSIAN_DIR)/gaussian_stage.v" \
 		TOPLEVEL=gaussian_stage \
 		COCOTB_TEST_MODULES=tests.test_gaussian_real_image \
-		COMPILE_ARGS="-Pgaussian_stage.IMG_WIDTH=1920 -Pgaussian_stage.IMG_HEIGHT=1080"
+		SIM_ARGS="-GIMG_WIDTH=1920 -GIMG_HEIGHT=1080"
 
 .PHONY: test_nms
 test_nms:
@@ -146,13 +148,18 @@ test_nms:
         VERILOG_SOURCES="$(COMMON_DIR)/line_buffer.v $(NMS_DIR)/row_buffer_3.v $(NMS_DIR)/nms_core.v $(NMS_DIR)/nms_stage.v" \
         TOPLEVEL=nms_stage \
         COCOTB_TEST_MODULES=tests.test_nms \
-        COMPILE_ARGS="-Pnms_stage.IMG_WIDTH=20"
+        SIM_ARGS="-GIMG_WIDTH=20"
 
 # Clean
 .PHONY: clean
 clean:
 	rm -rf sim_build results.xml __pycache__ tests/__pycache__ models/__pycache__
 	rm -rf *.vcd *.fst
+
+# Waveform viewing 
+.PHONY: wave
+wave:
+	vsim -view vsim.wlf
 
 .PHONY: help
 help:
@@ -161,7 +168,9 @@ help:
 	@echo "  make test_line_buffer    - Test Line Buffer"
 	@echo "  make test_row_buffer     - Test 5-Row Buffer"
 	@echo "  make test_gaussian_core  - Test Gaussian 5x5 Core"
-	@echo "  make test_gaussian_stage - Test Full Gaussian Stage"
+	@echo "  make test_gaussian_stage - Test Gaussian Stage (default: test_gaussian_stage_small_frame)"
+	@echo "                             Override with TESTCASE=<name>"
 	@echo "  make test_gaussian_stage_1080p - Gaussian stage 1920x1080 real image"
 	@echo "  make all                 - Run all tests"
 	@echo "  make clean               - Clean build artifacts"
+	@echo "  make wave                - View waveform in ModelSim"

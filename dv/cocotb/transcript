@@ -13,7 +13,4 @@
 # // and may not be used in any way not expressly authorized by SISW.
 # //
 # vsim.wlf opened as dataset "vsim"
-add wave -position end vsim:/pe/*
-# Break key hit
-# Break key hit
-# Break key hit
+add wave -position end vsim:/gaussian_stage/*
