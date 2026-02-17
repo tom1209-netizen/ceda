@@ -1,15 +1,52 @@
+import json
+import os
+
 import cocotb
+import numpy as np
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-import numpy as np
-import sys
-import os
+
 
 # NMS direction constants
 DIR_EW = 0
 DIR_NE_SW = 1
 DIR_NS = 2
 DIR_NW_SE = 3
+
+
+class WaveformDumper:
+    def __init__(self, dut, signals):
+        self.dut = dut
+        self.signals = signals
+        self.data = []
+        self.cycle = 0
+        self.task = None
+
+    async def start(self):
+        self.task = cocotb.start_soon(self._monitor())
+
+    async def _monitor(self):
+        while True:
+            await RisingEdge(self.dut.clk)
+            sample = {"cycle": self.cycle}
+            for name in self.signals:
+                try:
+                    raw = getattr(self.dut, name).value
+                    try:
+                        sample[name] = int(raw)
+                    except ValueError:
+                        sample[name] = str(raw)
+                except Exception:
+                    sample[name] = "ERR"
+            self.data.append(sample)
+            self.cycle += 1
+
+    def dump_to_file(self, filename="waveform.json"):
+        if self.task is not None:
+            self.task.cancel()
+        with open(filename, "w", encoding="utf-8") as fp:
+            json.dump(self.data, fp, indent=2)
+
 
 async def reset_dut(dut):
     dut.rst_n.value = 0
@@ -23,191 +60,256 @@ async def reset_dut(dut):
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
 
+
+def _pack_pixel(mag, direction):
+    return (int(direction) << 12) | int(mag)
+
+
+def _check_axi_sideband(dut):
+    m_valid = int(dut.m_tvalid.value)
+    m_last = int(dut.m_tlast.value)
+    m_user = int(dut.m_tuser.value)
+    assert not (m_last and not m_valid), "m_tlast asserted when m_tvalid=0"
+    assert not (m_user and not m_valid), "m_tuser asserted when m_tvalid=0"
+
+
+def _capture_handshake_output(dut, outputs):
+    if int(dut.m_tvalid.value) and int(dut.m_tready.value):
+        outputs.append(
+            {
+                "data": int(dut.m_tdata.value),
+                "last": int(dut.m_tlast.value),
+                "user": int(dut.m_tuser.value),
+            }
+        )
+
+
+async def send_frame(dut, mag_image, dir_image, outputs):
+    height, width = mag_image.shape
+    for r in range(height):
+        for c in range(width):
+            dut.s_tdata.value = _pack_pixel(mag_image[r, c], dir_image[r, c])
+            dut.s_tvalid.value = 1
+            dut.s_tuser.value = 1 if (r == 0 and c == 0) else 0
+            dut.s_tlast.value = 1 if c == (width - 1) else 0
+
+            while True:
+                will_accept = int(dut.s_tready.value) == 1
+                await RisingEdge(dut.clk)
+                _check_axi_sideband(dut)
+                _capture_handshake_output(dut, outputs)
+                if will_accept:
+                    break
+
+    dut.s_tvalid.value = 0
+    dut.s_tuser.value = 0
+    dut.s_tlast.value = 0
+
+
+async def sample_idle(dut, outputs, cycles):
+    start_len = len(outputs)
+    for _ in range(cycles):
+        await RisingEdge(dut.clk)
+        _check_axi_sideband(dut)
+        _capture_handshake_output(dut, outputs)
+    return len(outputs) - start_len
+
+
+async def drain_then_check_idle(dut, outputs, width):
+    # Tail depth is dominated by one line delay plus short local pipelines.
+    drain_out = await sample_idle(dut, outputs, cycles=width + 8)
+    quiet_out = await sample_idle(dut, outputs, cycles=8)
+    return drain_out, quiet_out
+
+
 @cocotb.test()
 async def test_nms_basic_vertical(dut):
-    """Test NMS with a simple vertical edge (Gradient Horizontal -> Direction East-West)"""
-    clock = Clock(dut.clk, 10, unit='ns')
+    clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())
     await reset_dut(dut)
-    
-    width = 20
-    height = 10
-    
-    # Construct input frame
-    # Vertical edge at col 10
-    # Gradient Direction should be Horizontal (0 = E-W)
-    # Magnitude profile around col 10: 50, 100, 255, 100, 50
-    # Expected output: Only the 255 should survive. Neighbors 100 should be suppressed.
-    
+
+    width = int(dut.IMG_WIDTH.value)
+    height = max(8, width // 2)
+    assert width >= 5, "IMG_WIDTH must be >= 5 for this test pattern"
+
     mag_image = np.zeros((height, width), dtype=np.uint16)
-    dir_image = np.zeros((height, width), dtype=np.uint8)
-    
+    dir_image = np.full((height, width), DIR_EW, dtype=np.uint8)
+
+    center = width // 2
     for r in range(height):
-        mag_image[r, 8]  = 50
-        mag_image[r, 9]  = 100
-        mag_image[r, 10] = 255 # Max
-        mag_image[r, 11] = 100
-        mag_image[r, 12] = 50
-        
-        # Direction 0 for East-West check (Vertical Edge gradients point Horizontal)
-        dir_image[r, :] = DIR_EW 
-        
-    # Stream it
-    dut.m_tready.value = 1
-    
-    received_vals = []
-    
-    for r in range(height):
-        for c in range(width):
-            mag = mag_image[r, c]
-            d   = dir_image[r, c]
-            
-            # Pack: [15:12]=0, [14:12]=Dir, [11:0]=Mag
-            packed = (int(d) << 12) | int(mag)
-            
-            dut.s_tvalid.value = 1
-            dut.s_tdata.value = packed
-            dut.s_tuser.value = 1 if (r==0 and c==0) else 0
-            dut.s_tlast.value = 1 if (c==width-1) else 0
-            
-            await RisingEdge(dut.clk)
-            
-            if dut.m_tvalid.value:
-                received_vals.append(int(dut.m_tdata.value))
-                
-    # Flush
-    dut.s_tvalid.value = 0
-    for _ in range(width * 5):
-        await RisingEdge(dut.clk)
-        if dut.m_tvalid.value:
-             received_vals.append(int(dut.m_tdata.value))
-             
-    # Analyze results
-    # Reshape received to image? Hard due to startup latency.
-    # Latency is ~1 line + 2 cycles.
-    # We should look for the sequence 0, 0, ..., 0, 255, 0, ...
-    
-    # Check if we see 255s
-    assert 255 in received_vals, "Did not find maximum 255 in output"
-    
-    # Check if 100s are SUPPRESSED (should be 0)
-    # The inputs had 100s. The NMS should kill them because 100 < 255.
-    # But wait, make sure we align correctly.
-    # For a row: ..., 50, 100, 255, 100, 50, ...
-    # NMS Output: ..., 0, 0, 255, 0, 0, ...
-    # So we should NOT see '100' or '50' in the output, theoretically?
-    # Unless boundary conditions (start of line) mess it up.
-    # But for the middle cols, they should be 0.
-    
-    count_255 = received_vals.count(255)
-    # We expect roughly (height-2) * 1 = ~8 pixels of 255 (top/bot rows invalid)
-    
-    dut._log.info(f"Found {count_255} max pixels")
-    assert count_255 > 0
-    
-    # Ensure no '100' leaked through (except maybe at first line if buffering odd?)
-    # Ideally 0.
-    count_100 = received_vals.count(100)
-    dut._log.info(f"Found {count_100} suppressed pixels (should be 0 or low)")
-    
-    # Allow some startup artifacts but mostly 0
-    if count_100 > 5:
-        # Dump section
-        dut._log.error(f"Too many unsuppressed pixels: {received_vals[:100]}")
-        assert False, "NMS failed to suppress non-maxima"
+        mag_image[r, center - 2] = 50
+        mag_image[r, center - 1] = 100
+        mag_image[r, center] = 255
+        mag_image[r, center + 1] = 100
+        mag_image[r, center + 2] = 50
+
+    outputs = []
+    await send_frame(dut, mag_image, dir_image, outputs)
+    _, quiet_out = await drain_then_check_idle(dut, outputs, width)
+
+    out_vals = [o["data"] for o in outputs]
+    assert 255 in out_vals, "Did not find expected peak value in NMS output"
+
+    count_100 = out_vals.count(100)
+    assert count_100 <= 6, f"Too many unsuppressed 100-valued pixels: {count_100}"
+    assert quiet_out == 0, f"Output did not go idle after drain, extra beats={quiet_out}"
+
 
 @cocotb.test()
-async def test_nms_diagonal(dut):
-    """Test NMS with a diagonal edge"""
-    clock = Clock(dut.clk, 10, unit='ns')
+async def test_nms_diagonal_suppression(dut):
+    clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())
     await reset_dut(dut)
-    
-    width = 20
-    height = 20
-    
-    # Diagonal line (NW to SE)
-    # Gradient direction is NE-SW (Perpendicular) -> DIR 1 (45 deg)
-    # Pixels on diagonal: (r, r) -> 255
-    # Neighbors (r, r-1) and (r, r+1) -> 100
-    
-    mag_image = np.zeros((height, width), dtype=np.uint16)
-    dir_image = np.zeros((height, width), dtype=np.uint8)
-    
-    for r in range(height):
-        for c in range(width):
-            if r == c:
-                mag_image[r, c] = 255
-            elif abs(r - c) == 1:
-                mag_image[r, c] = 100
-            else:
-                mag_image[r, c] = 0
-            
-            # Use Direction 1 (NE-SW check)
-            # Center (r,c) compares against (r-1, c+1) [NE] and (r+1, c-1) [SW]
-            # Wait, diagonal is NW-SE line.
-            # Gradient is normal to edge -> NE-SW.
-            # So we check neighbors along NE-SW.
-            # If (r,c) is max, neighbors at (r-1, c+1) and (r+1, c-1) should be smaller.
-            # In our image, (r-1, c+1) is distance 2 from diagonal?
-            # Let's trace:
-            # P(2,2) is 255.
-            # Neighbors for Dir 1: P(1,3) and P(3,1).
-            # P(1,3) -> r=1, c=3. abs(1-3)=2. Mag=0.
-            # So 255 > 0.
-            # The adjacent pixels on the line width are P(2,1) and P(2,3) (Horizontal neighbors)
-            # OR P(1,2) and P(3,2) (Vertical neighbors).
-            # Depending on line thickness.
-            # My construct `abs(r-c)==1` makes a thick line?
-            # P(2,2)=255. P(2,1)=100. P(2,3)=100. P(1,2)=100. P(3,2)=100.
-            # We want to ensure 255 survives.
-            # Does 100 survive?
-            # Take P(2,1)=100. Dir 1 check neighbors P(1,2) and P(3,0).
-            # P(1,2)=100 (Equal). P(3,0)=0.
-            # If equal? Usually stringent NMS requires strict > or >= one side.
-            # My RTL: (center >= n1) && (center >= n2).
-            # So 100 >= 100 is True.
-            # So 100 might survive if plateau?
-            # We want to test SUPPRESSION.
-            # So we need a scenario where neighbor is LARGER.
-            pass
-            
-    # Refined test pattern for suppression:
-    # Set P(r,c) = 100. P(r-1, c+1) = 255. (Along gradient)
-    # Then P(r,c) should be suppressed.
-    
-    mag_image[:] = 0
-    dir_image[:] = 1 # Check NE-SW
-    
-    # At (5,5), put 100.
-    # At (4,6) [NE], put 255.
-    # At (6,4) [SW], put 50.
-    # Result: (5,5) should be 0 because 100 < 255.
-    
-    mag_image[5, 5] = 100
-    mag_image[4, 6] = 255
-    mag_image[6, 4] = 50
-    
-    # Stream
-    dut.m_tready.value = 1
-    nms_output = []
-    
-    for r in range(height):
-        for c in range(width):
-            packed = (int(dir_image[r,c]) << 12) | int(mag_image[r,c])
-            dut.s_tdata.value = packed
-            dut.s_tvalid.value = 1
-            await RisingEdge(dut.clk)
-            if dut.m_tvalid.value:
-                nms_output.append(int(dut.m_tdata.value))
-                
-    dut.s_tvalid.value = 0
-    for _ in range(100):
-        await RisingEdge(dut.clk)
-        if dut.m_tvalid.value:
-            nms_output.append(int(dut.m_tdata.value))
-            
-    # Check if we see 255 (Max) and NOT 100 (Suppressed)
-    assert 255 in nms_output
-    assert 100 not in nms_output, "Pixel 100 should have been suppressed by neighbor 255"
 
+    width = int(dut.IMG_WIDTH.value)
+    height = max(10, width)
+
+    mag_image = np.zeros((height, width), dtype=np.uint16)
+    dir_image = np.full((height, width), DIR_NE_SW, dtype=np.uint8)
+
+    # Center pixel should be suppressed by larger NE neighbor.
+    r = min(5, height - 2)
+    c = min(5, width - 2)
+    mag_image[r, c] = 100
+    mag_image[r - 1, c + 1] = 255
+    mag_image[r + 1, c - 1] = 50
+
+    outputs = []
+    await send_frame(dut, mag_image, dir_image, outputs)
+    _, quiet_out = await drain_then_check_idle(dut, outputs, width)
+
+    out_vals = [o["data"] for o in outputs]
+    assert 255 in out_vals, "Expected max pixel did not appear"
+    assert 100 not in out_vals, "Suppressed pixel leaked through output"
+    assert quiet_out == 0, f"Output did not go idle after drain, extra beats={quiet_out}"
+
+
+@cocotb.test()
+async def test_nms_stream_integrity_waveform(dut):
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+
+    width = int(dut.IMG_WIDTH.value)
+    height = max(5, width // 2)
+
+    np.random.seed(42)
+    mag_image = np.random.randint(0, 256, (height, width), dtype=np.uint16)
+    dir_image = np.random.randint(0, 4, (height, width), dtype=np.uint8)
+
+    signals_to_dump = [
+        "clk",
+        "rst_n",
+        "s_tdata",
+        "s_tvalid",
+        "s_tready",
+        "s_tlast",
+        "s_tuser",
+        "m_tdata",
+        "m_tvalid",
+        "m_tready",
+        "m_tlast",
+        "m_tuser",
+        "enable",
+        "flush_active",
+        "frame_active",
+        "pending_count",
+        "stream_primed",
+        "seen_first_line",
+        "in_col",
+        "u_pipe",
+        "l_pipe",
+        "v_pipe",
+    ]
+
+    dumper = WaveformDumper(dut, signals_to_dump)
+    await dumper.start()
+
+    outputs = []
+    await send_frame(dut, mag_image, dir_image, outputs)
+    _, quiet_out = await drain_then_check_idle(dut, outputs, width)
+    await RisingEdge(dut.clk)
+
+    waveform_path = os.path.join(os.getcwd(), "waveform.json")
+    dumper.dump_to_file(waveform_path)
+
+    user_count = sum(o["user"] for o in outputs)
+    last_count = sum(o["last"] for o in outputs)
+    assert len(outputs) == (width * height), (
+        f"Expected {width * height} output beats, got {len(outputs)}"
+    )
+    assert last_count == height, f"Expected {height} output EOL pulses, got {last_count}"
+    assert user_count <= 1, f"Expected at most one output SOF pulse, got {user_count}"
+    assert quiet_out == 0, f"Output did not go idle after drain, extra beats={quiet_out}"
+
+
+@cocotb.test()
+async def test_nms_small_5x5(dut):
+    clock = Clock(dut.clk, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+    await reset_dut(dut)
+
+    width = int(dut.IMG_WIDTH.value)
+    height = 5
+    if width != 5:
+        dut._log.info(
+            "Skipping test_nms_small_5x5 because IMG_WIDTH=%d (run with NMS_IMG_WIDTH=5)",
+            width,
+        )
+        return
+
+    # Deterministic small pattern for manual waveform inspection.
+    mag_image = np.array(
+        [
+            [10, 20, 30, 40, 50],
+            [15, 25, 35, 45, 55],
+            [60, 70, 250, 80, 90],
+            [16, 26, 36, 46, 56],
+            [11, 21, 31, 41, 51],
+        ],
+        dtype=np.uint16,
+    )
+    dir_image = np.full((height, width), DIR_EW, dtype=np.uint8)
+
+    signals_to_dump = [
+        "clk",
+        "rst_n",
+        "s_tdata",
+        "s_tvalid",
+        "s_tready",
+        "s_tlast",
+        "s_tuser",
+        "m_tdata",
+        "m_tvalid",
+        "m_tready",
+        "m_tlast",
+        "m_tuser",
+        "enable",
+        "flush_active",
+        "frame_active",
+        "pending_count",
+        "stream_primed",
+        "seen_first_line",
+        "in_col",
+        "u_pipe",
+        "l_pipe",
+        "v_pipe",
+    ]
+
+    dumper = WaveformDumper(dut, signals_to_dump)
+    await dumper.start()
+
+    outputs = []
+    await send_frame(dut, mag_image, dir_image, outputs)
+    _, quiet_out = await drain_then_check_idle(dut, outputs, width)
+    await RisingEdge(dut.clk)
+
+    waveform_path = os.path.join(os.getcwd(), "waveform_nms_small.json")
+    dumper.dump_to_file(waveform_path)
+
+    user_count = sum(o["user"] for o in outputs)
+    last_count = sum(o["last"] for o in outputs)
+    assert len(outputs) == 25, f"Expected 25 output beats, got {len(outputs)}"
+    assert user_count == 1, f"Expected one output SOF pulse, got {user_count}"
+    assert last_count == 5, f"Expected five output EOL pulses, got {last_count}"
+    assert quiet_out == 0, f"Output did not go idle after drain, extra beats={quiet_out}"

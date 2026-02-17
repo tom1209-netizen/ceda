@@ -4,6 +4,8 @@ SHELL := /bin/bash
 SIM ?= modelsim
 TOPLEVEL_LANG ?= verilog
 TESTCASE ?= test_gaussian_stage_small_frame
+NMS_TESTCASE ?=
+NMS_IMG_WIDTH ?= 20
 
 # Project paths
 RTL_DIR := ../../hw/rtl
@@ -148,7 +150,8 @@ test_nms:
         VERILOG_SOURCES="$(COMMON_DIR)/line_buffer.v $(NMS_DIR)/row_buffer_3.v $(NMS_DIR)/nms_core.v $(NMS_DIR)/nms_stage.v" \
         TOPLEVEL=nms_stage \
         COCOTB_TEST_MODULES=tests.test_nms \
-        SIM_ARGS="-GIMG_WIDTH=20"
+        COCOTB_TESTCASE=$(NMS_TESTCASE) \
+        SIM_ARGS="-GIMG_WIDTH=$(NMS_IMG_WIDTH)"
 
 # Clean
 .PHONY: clean

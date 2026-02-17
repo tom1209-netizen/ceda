@@ -21,13 +21,42 @@ module nms_stage #(
     input  wire       m_tready
 );
 
+    // =========================================================================
+    // Datapath Inputs
+    // =========================================================================
     wire [DATA_WIDTH-1:0] mag_in = s_tdata[DATA_WIDTH-1:0];
-    wire [ DIR_WIDTH-1:0] dir_in = s_tdata[14:12];
+    wire [DIR_WIDTH-1:0] dir_in = s_tdata[14:12];
 
-    // Backpressure / Enable
-    assign s_tready = m_tready;
-    wire enable = s_tvalid & m_tready;
+    // =========================================================================
+    // Control Path
+    // =========================================================================
+    // Backpressure / step-enable control
+    reg flush_active;
+    reg frame_active;
+    reg [31:0] pending_count;
 
+    wire input_accept;
+    wire output_accept;
+    wire flush_start;
+    wire enable;
+
+    // Do not accept new input while draining tail beats of the current frame.
+    assign flush_start = ~flush_active & frame_active & ~s_tvalid & (pending_count != 0);
+    assign s_tready = m_tready & ~(flush_active | flush_start);
+    assign input_accept = s_tvalid & s_tready;
+    assign output_accept = m_tvalid & m_tready;
+    // Advance datapath either on real input or on flush padding beats.
+    assign enable = m_tready & (input_accept | flush_active | flush_start);
+
+    wire [DATA_WIDTH-1:0] mag_in_step = input_accept ? mag_in : {DATA_WIDTH{1'b0}};
+    wire [DIR_WIDTH-1:0] dir_in_step = input_accept ? dir_in : {DIR_WIDTH{1'b0}};
+    wire user_in_step = input_accept & s_tuser;
+    wire last_in_step = input_accept & s_tlast;
+    wire valid_in_step = input_accept;
+
+    // =========================================================================
+    // Datapath: 3x3 Window Generation
+    // =========================================================================
     // Line Buffering for Magnitude
     wire [DATA_WIDTH-1:0] row_0, row_1, row_2;
 
@@ -38,7 +67,7 @@ module nms_stage #(
         .clk(clk),
         .rst_n(rst_n),
         .enable(enable),
-        .pixel_in(mag_in),
+        .pixel_in(mag_in_step),
         .row_0(row_0),
         .row_1(row_1),
         .row_2(row_2)
@@ -54,7 +83,7 @@ module nms_stage #(
         .clk(clk),
         .rst_n(rst_n),
         .enable(enable),
-        .data_in(dir_in),
+        .data_in(dir_in_step),
         .data_out(dir_delayed_line)
     );
 
@@ -98,6 +127,9 @@ module nms_stage #(
         end
     end
 
+    // =========================================================================
+    // Datapath: NMS Core Compute
+    // =========================================================================
     // Core Logic
     wire [7:0] nms_out;
     nms_core u_core (
@@ -114,6 +146,9 @@ module nms_stage #(
         .out_val(nms_out)
     );
 
+    // =========================================================================
+    // Datapath: Sideband Alignment
+    // =========================================================================
     // Control Signal Delay
     wire u_out, l_out;
     line_buffer #(
@@ -123,7 +158,7 @@ module nms_stage #(
         .clk(clk),
         .rst_n(rst_n),
         .enable(enable),
-        .data_in(s_tuser),
+        .data_in(user_in_step),
         .data_out(u_out)
     );
     line_buffer #(
@@ -133,7 +168,7 @@ module nms_stage #(
         .clk(clk),
         .rst_n(rst_n),
         .enable(enable),
-        .data_in(s_tlast),
+        .data_in(last_in_step),
         .data_out(l_out)
     );
 
@@ -145,24 +180,93 @@ module nms_stage #(
         .clk(clk),
         .rst_n(rst_n),
         .enable(enable),
-        .data_in(s_tvalid),
+        .data_in(valid_in_step),
         .data_out(v_out_lb)
     );
 
-    // Warmup Counter to mask undefined BRAM (X) output
-    reg [11:0] warmup_cnt;
+    // =========================================================================
+    // Control Path: Priming and Tail Drain
+    // =========================================================================
+    // Frame priming state:
+    // - seen_first_line rises once first input line has completed.
+    // - stream_primed rises once first line plus one extra pixel is accepted.
+    // This replaces counter-based warmup masking.
+    reg [11:0] in_col;
+    reg seen_first_line;
+    reg stream_primed;
+    // Assert primed on the first accepted beat after line 0 has completed.
+    wire first_line_plus_one = seen_first_line & (in_col == 0);
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            warmup_cnt <= 0;
-        end else if (enable) begin
-            if (warmup_cnt < IMG_WIDTH + 1) begin
-                warmup_cnt <= warmup_cnt + 1;
+            in_col          <= 0;
+            seen_first_line <= 1'b0;
+            stream_primed   <= 1'b0;
+        end else if (input_accept) begin
+            if (s_tuser) begin
+                in_col          <= 0;
+                seen_first_line <= 1'b0;
+                stream_primed   <= 1'b0;
+            end else begin
+                if (s_tlast) begin
+                    in_col <= 0;
+                    seen_first_line <= 1'b1;
+                end else begin
+                    in_col <= in_col + 1'b1;
+                end
+                if (first_line_plus_one) begin
+                    stream_primed <= 1'b1;
+                end
             end
         end
     end
 
-    wire v_out_masked = (warmup_cnt >= IMG_WIDTH + 1) ? v_out_lb : 1'b0;
+    // Event-driven tail drain:
+    // - Track how many input beats have been accepted but not yet emitted.
+    // - When source goes idle and pending beats remain, inject zero-pad beats
+    //   until pending_count drains to zero.
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            frame_active  <= 1'b0;
+            flush_active  <= 1'b0;
+            pending_count <= 32'd0;
+        end else begin
+            if (input_accept && s_tuser) begin
+                frame_active  <= 1'b1;
+                flush_active  <= 1'b0;
+                pending_count <= 32'd1;
+            end else begin
+                case ({
+                    input_accept, output_accept
+                })
+                    2'b10: pending_count <= pending_count + 1'b1;
+                    2'b01: begin
+                        if (pending_count != 0) begin
+                            pending_count <= pending_count - 1'b1;
+                        end
+                    end
+                    default: begin
+                    end
+                endcase
 
+                if (!flush_active && flush_start) begin
+                    flush_active <= 1'b1;
+                end else if (
+                    flush_active &&
+                    ((pending_count == 0) || ((pending_count == 1) && output_accept && !input_accept))
+                ) begin
+                    flush_active <= 1'b0;
+                    frame_active <= 1'b0;
+                end
+            end
+        end
+    end
+
+    wire v_out_masked = stream_primed ? v_out_lb : 1'b0;
+
+    // =========================================================================
+    // Datapath: Output Register Stage
+    // =========================================================================
     // Output Pipeline
     reg [1:0] u_pipe, l_pipe, v_pipe;
 
@@ -184,8 +288,14 @@ module nms_stage #(
             // Output assignments
             m_tdata  <= nms_out;
             m_tvalid <= v_pipe[1];
-            m_tuser  <= u_pipe[1];
-            m_tlast  <= l_pipe[1];
+            m_tuser  <= v_pipe[1] & u_pipe[1];
+            m_tlast  <= v_pipe[1] & l_pipe[1];
+        end else if (m_tready) begin
+            // No accepted input this cycle: clear output-valid sideband so
+            // stale values do not repeat when source goes idle.
+            m_tvalid <= 1'b0;
+            m_tuser  <= 1'b0;
+            m_tlast  <= 1'b0;
         end
     end
 
