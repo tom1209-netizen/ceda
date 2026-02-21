@@ -16,8 +16,8 @@ module row_buffer_3 #(
     output wire [DATA_WIDTH-1:0] row_1,
     output wire [DATA_WIDTH-1:0] row_2
 );
-    localparam int ROWS = 3;
-    localparam int MAX_ROW_DELAY = ROWS - 1;  // 2
+    localparam  ROWS = 3;
+    localparam  MAX_ROW_DELAY = ROWS - 1;  // 2
 
     // Line buffer outputs (delayed rows)
     wire [DATA_WIDTH-1:0] lb_out[0:ROWS-1];

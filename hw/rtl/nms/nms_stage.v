@@ -12,6 +12,7 @@ module nms_stage #(
     input  wire        s_tuser,
     input  wire        s_tlast,
     output wire        s_tready,
+    input  wire        s_teof,
 
     // AXI-Stream Output
     output reg  [7:0] m_tdata,
@@ -39,9 +40,16 @@ module nms_stage #(
     wire output_accept;
     wire flush_start;
     wire enable;
+    
+    reg s_teof_prev;
+    
+    always @(posedge clk)
+    begin
+        s_teof_prev <= s_teof;
+    end
 
     // Do not accept new input while draining tail beats of the current frame.
-    assign flush_start = ~flush_active & frame_active & ~s_tvalid & (pending_count != 0);
+    assign flush_start = ~flush_active & frame_active & ~s_tvalid & s_teof_prev & (pending_count != 0);
     assign s_tready = m_tready & ~(flush_active | flush_start);
     assign input_accept = s_tvalid & s_tready;
     assign output_accept = m_tvalid & m_tready;
