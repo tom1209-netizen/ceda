@@ -14,7 +14,8 @@ A real-time edge detection accelerator implementing the Canny algorithm, optimiz
 6. [Thresholding Stage](#6-thresholding-stage)
 7. [Line Buffer Architecture](#7-line-buffer-architecture)
 8. [Resource Utilization Estimates](#8-resource-utilization-estimates)
-9. [References](#9-references)
+9. [Experimental Filter Outputs](#9-experimental-filter-outputs)
+10. [References](#10-references)
 
 ## Directory Structure
 
@@ -804,7 +805,27 @@ Projected resource usage on Xilinx XC7Z020:
 > [!NOTE]
 > The design uses minimal FPGA resources, leaving significant capacity for additional processing (e.g., connected component labeling, blob tracking).
 
-## 9. References
+## 9. Experimental Filter Outputs
+
+<p align="center">
+  <img src="./dv/cocotb/tests/test_output/image_out_gaus.png" alt="Gaussian Stage">
+  <br>
+  <i>Figure 1: Output after applying the Gaussian Blur filter.</i>
+</p>
+
+<p align="center">
+  <img src="./dv/cocotb/tests/test_output/image_out_gaus_sobel_mag.png" alt="Sobel Stage">
+  <br>
+  <i>Figure 2: Gradient magnitude calculated by the Sobel operator.</i>
+</p>
+
+<p align="center">
+  <img src="./dv/cocotb/tests/test_output/image_out_canny.png" alt="NMS Stage">
+  <br>
+  <i>Figure 3: Final edges after Non-Maximum Suppression (NMS).</i>
+</p>
+
+## 10. References
 
 1. Canny, J. "A Computational Approach to Edge Detection." IEEE TPAMI, 1986.
 2. Zynq-7000 SoC Technical Reference Manual (UG585)
