@@ -1,0 +1,45 @@
+{
+  "test": "test_line_buffer_reset",
+  "toplevel": "line_buffer",
+  "clock": "clk",
+  "signals": [
+    "ADDR_WIDTH",
+    "DATA_WIDTH",
+    "LINE_WIDTH",
+    "addr",
+    "clk",
+    "data_in",
+    "data_out",
+    "enable",
+    "i",
+    "rst_n"
+  ],
+  "samples": [
+    {
+      "cycle": 0,
+      "ADDR_WIDTH": 11,
+      "DATA_WIDTH": 8,
+      "LINE_WIDTH": 32,
+      "addr": 10,
+      "clk": 1,
+      "data_in": 123,
+      "data_out": 74,
+      "enable": 1,
+      "i": 32,
+      "rst_n": 1
+    },
+    {
+      "cycle": 1,
+      "ADDR_WIDTH": 11,
+      "DATA_WIDTH": 8,
+      "LINE_WIDTH": 32,
+      "addr": 11,
+      "clk": 1,
+      "data_in": 123,
+      "data_out": 75,
+      "enable": 1,
+      "i": 32,
+      "rst_n": 1
+    }
+  ]
+}

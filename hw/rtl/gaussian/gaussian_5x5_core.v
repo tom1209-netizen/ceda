@@ -27,8 +27,9 @@ module gaussian_5x5_core #(
     localparam int COLS = 5;
 
     // Data latency from the presented window edge to pixel_out is:
-    // - 5 registered PE stages per row + 1 output register = 6 cycles.
-    localparam int OUT_LATENCY = COLS + 1;  // 6
+    // - 1 cycle for the sequential PE evaluation (pipeline stage broadcast update)
+    // - 1 cycle for the output normalized register
+    localparam int OUT_LATENCY = 2;
 
     // =========================================================================
     // Control Path

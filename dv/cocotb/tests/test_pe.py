@@ -1,5 +1,6 @@
 import cocotb
 from cocotb.clock import Clock
+from tests.trace import traced_test
 from cocotb.triggers import RisingEdge
 
 async def reset_dut(dut):
@@ -15,7 +16,7 @@ async def reset_dut(dut):
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_pe")
 async def test_pe_reset(dut):
     """Test reset clears accumulator"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -25,7 +26,7 @@ async def test_pe_reset(dut):
     
     assert int(dut.acc_out.value) == 0, "acc_out should be 0 after reset"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_pe")
 async def test_pe_single_mac(dut):
     """Test single MAC operation"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -47,7 +48,7 @@ async def test_pe_single_mac(dut):
     # Expected: 10 * 5 = 50
     assert int(dut.acc_out.value) == 50, f"Expected 50, got {int(dut.acc_out.value)}"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_pe")
 async def test_pe_accumulate(dut):
     """Test accumulation from previous PE"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -68,7 +69,7 @@ async def test_pe_accumulate(dut):
     # Expected: 100 + (10 * 5) = 150
     assert int(dut.acc_out.value) == 150, f"Expected 150, got {int(dut.acc_out.value)}"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_pe")
 async def test_pe_chain_simulation(dut):
     """Simulate a chain of MACs (what happens in a row of PEs)"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -98,7 +99,7 @@ async def test_pe_chain_simulation(dut):
     
     assert running_sum == expected_sum, f"Expected {expected_sum}, got {running_sum}"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_pe")
 async def test_pe_gaussian_coefficients(dut):
     """Test with actual Gaussian kernel coefficients"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -127,7 +128,7 @@ async def test_pe_gaussian_coefficients(dut):
     
     assert running_sum == expected_sum, f"Expected {expected_sum}, got {running_sum}"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_pe")
 async def test_pe_enable_freeze(dut):
     """Test that PE freezes when enable is low"""
     clock = Clock(dut.clk, 10, unit='ns')

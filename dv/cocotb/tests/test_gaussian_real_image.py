@@ -4,6 +4,7 @@ import sys
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
+from tests.trace import traced_test
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "models"))
@@ -132,7 +133,7 @@ def _best_alignment_offset(
     return best_offset, best_err
 
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_gaussian_real_image")
 async def test_gaussian_stage_real_image_1080p(dut):
     clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())

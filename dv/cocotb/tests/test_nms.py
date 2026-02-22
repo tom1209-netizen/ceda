@@ -5,6 +5,7 @@ import cocotb
 import numpy as np
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
+from tests.trace import traced_test
 
 
 # NMS direction constants
@@ -122,7 +123,7 @@ async def drain_then_check_idle(dut, outputs, width):
     return drain_out, quiet_out
 
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_nms")
 async def test_nms_basic_vertical(dut):
     clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())
@@ -155,7 +156,7 @@ async def test_nms_basic_vertical(dut):
     assert quiet_out == 0, f"Output did not go idle after drain, extra beats={quiet_out}"
 
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_nms")
 async def test_nms_diagonal_suppression(dut):
     clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())
@@ -184,7 +185,7 @@ async def test_nms_diagonal_suppression(dut):
     assert quiet_out == 0, f"Output did not go idle after drain, extra beats={quiet_out}"
 
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_nms")
 async def test_nms_stream_integrity_waveform(dut):
     clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())
@@ -243,7 +244,7 @@ async def test_nms_stream_integrity_waveform(dut):
     assert quiet_out == 0, f"Output did not go idle after drain, extra beats={quiet_out}"
 
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_nms")
 async def test_nms_small_5x5(dut):
     clock = Clock(dut.clk, 10, unit="ns")
     cocotb.start_soon(clock.start())

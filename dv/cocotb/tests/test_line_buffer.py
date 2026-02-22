@@ -1,5 +1,6 @@
 import cocotb
 from cocotb.clock import Clock
+from tests.trace import traced_test
 from cocotb.triggers import RisingEdge, Timer
 import random
 
@@ -13,7 +14,7 @@ async def reset_dut(dut):
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_line_buffer")
 async def test_line_buffer_delay(dut):
     """Test that line buffer delays by exactly LINE_WIDTH cycles"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -61,7 +62,7 @@ async def test_line_buffer_delay(dut):
     
     assert errors == 0, f"{errors} delay mismatches found"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_line_buffer")
 async def test_line_buffer_enable(dut):
     """Test that buffer freezes when enable is low"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -85,7 +86,7 @@ async def test_line_buffer_enable(dut):
         assert dut.data_out.value == last_output, \
             "Output should not change when enable is low"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_line_buffer")
 async def test_line_buffer_reset(dut):
     """Test reset behavior"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -102,7 +103,7 @@ async def test_line_buffer_reset(dut):
     
     assert int(dut.data_out.value) == 0, "Output should be 0 after reset"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_line_buffer")
 async def test_line_buffer_random_data(dut):
     """Test with random data pattern"""
     clock = Clock(dut.clk, 10, unit='ns')

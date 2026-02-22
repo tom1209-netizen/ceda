@@ -1,19 +1,20 @@
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge
+from tests.trace import traced_test
 import numpy as np
 
 async def reset_dut(dut):
     """Apply reset to DUT"""
     dut.rst_n.value = 0
-    dut.enable.value = 0
-    dut.pixel_in.value = 0
+    dut.valid_in.value = 0
+    dut.din.value = 0
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_row_buffer_5")
 async def test_row_buffer_basic(dut):
     """Test basic row buffering functionality"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -21,10 +22,10 @@ async def test_row_buffer_basic(dut):
     
     await reset_dut(dut)
     
-    width = int(dut.LINE_WIDTH.value)
+    width = int(dut.IMG_WIDTH.value)
     
     # Enable module
-    dut.enable.value = 1
+    dut.valid_in.value = 1
     
     # Feed test pattern: Line 0 has value 0, Line 1 has 1, etc.
     # We want to see if rows appear at the outputs in correct order.
@@ -35,7 +36,7 @@ async def test_row_buffer_basic(dut):
     for line_idx in range(num_lines):
         pixel_val = line_idx % 256
         for col in range(width):
-            dut.pixel_in.value = pixel_val
+            dut.din.value = pixel_val
             await RisingEdge(dut.clk)
             
             # Check outputs
@@ -48,13 +49,13 @@ async def test_row_buffer_basic(dut):
     
     dut._log.info("Finished driving lines")
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_row_buffer_5")
 async def test_row_buffer_verify_content(dut):
     """Verify exact content with random data"""
     clock = Clock(dut.clk, 10, unit='ns')
     cocotb.start_soon(clock.start())
     await reset_dut(dut)
-    dut.enable.value = 1
+    dut.valid_in.value = 1
     
     width = 100 # Small width for test speed if parameter settable (test_row_buffer targets LINE_WIDTH=32)
     # The Makefile sets LINE_WIDTH=32.
@@ -65,16 +66,15 @@ async def test_row_buffer_verify_content(dut):
     for i in range(10):
         lines.append(np.random.randint(0, 256, width, dtype=np.int32))
         
-    # Drive and monitor
-    # Alignment latency is 4 cycles.
-    LATENCY = 4 
+    # Alignment latency is 0 cycles.
+    LATENCY = 0 
     
     # To check output at cycle T (processing col C of line L), we need valid history.
     
     for l_idx in range(10):
         current_line = lines[l_idx]
         for c_idx in range(width):
-            dut.pixel_in.value = int(current_line[c_idx])
+            dut.din.value = int(current_line[c_idx])
             await RisingEdge(dut.clk)
             
             # Check outputs after latency
@@ -90,35 +90,34 @@ async def test_row_buffer_verify_content(dut):
     
     # Restart validation
     await reset_dut(dut)
-    dut.enable.value = 1
+    dut.valid_in.value = 1
     
     received_rows = [[], [], [], [], []]
     
     # Feed 10 lines
     for l_idx in range(10):
         for c_idx in range(width):
-            dut.pixel_in.value = int(lines[l_idx][c_idx])
+            dut.din.value = int(lines[l_idx][c_idx])
             await RisingEdge(dut.clk)
             
             # Capture outputs
-            # Valid data starts appearing after initial fill.
-            # Due to 4 cycle alignment delay, we expect valid data for col 0 at cycle 4.
+            # Valid data starts appearing immediately (combinational for dout4).
             # Capture everything, align later.
-            received_rows[0].append(int(dut.row_0.value))
-            received_rows[1].append(int(dut.row_1.value))
-            received_rows[2].append(int(dut.row_2.value))
-            received_rows[3].append(int(dut.row_3.value))
-            received_rows[4].append(int(dut.row_4.value))
+            received_rows[0].append(int(dut.dout0.value))
+            received_rows[1].append(int(dut.dout1.value))
+            received_rows[2].append(int(dut.dout2.value))
+            received_rows[3].append(int(dut.dout3.value))
+            received_rows[4].append(int(dut.dout4.value))
             
     # Flush
-    dut.pixel_in.value = 0
+    dut.din.value = 0
     for _ in range(300):
         await RisingEdge(dut.clk)
-        received_rows[0].append(int(dut.row_0.value))
-        received_rows[1].append(int(dut.row_1.value))
-        received_rows[2].append(int(dut.row_2.value))
-        received_rows[3].append(int(dut.row_3.value))
-        received_rows[4].append(int(dut.row_4.value))
+        received_rows[0].append(int(dut.dout0.value))
+        received_rows[1].append(int(dut.dout1.value))
+        received_rows[2].append(int(dut.dout2.value))
+        received_rows[3].append(int(dut.dout3.value))
+        received_rows[4].append(int(dut.dout4.value))
 
     # Verification
     # row_4 should match lines[0], lines[1]... delayed by 4 cycles.
@@ -146,19 +145,19 @@ async def test_row_buffer_verify_content(dut):
             return False
         return True
 
-    # ROW 4: Input, aligned 4 cycles.
-    assert check_stream("row_4", received_rows[4], lines, 4)
+    # ROW 4: Input, aligned 0 cycles.
+    assert check_stream("row_4", received_rows[4], lines, 0)
     
     # ROW 3: Line buffer 3. Should be 1 line behind row_4.
-    assert check_stream("row_3", received_rows[3], lines, 4 + width)
+    assert check_stream("row_3", received_rows[3], lines, 0 + width)
     
     # ROW 2: Delayed by 2*width
-    assert check_stream("row_2", received_rows[2], lines, 4 + 2*width)
+    assert check_stream("row_2", received_rows[2], lines, 0 + 2*width)
     
     # ROW 1: Delayed by 3*width
-    assert check_stream("row_1", received_rows[1], lines, 4 + 3*width)
+    assert check_stream("row_1", received_rows[1], lines, 0 + 3*width)
     
     # ROW 0: Delayed by 4*width
-    assert check_stream("row_0", received_rows[0], lines, 4 + 4*width)
+    assert check_stream("row_0", received_rows[0], lines, 0 + 4*width)
     
     dut._log.info("All rows verified correctly")

@@ -1,5 +1,6 @@
 import cocotb
 from cocotb.clock import Clock
+from tests.trace import traced_test
 from cocotb.triggers import RisingEdge
 import numpy as np
 import sys
@@ -146,7 +147,7 @@ async def send_frame(dut, image, img_width, img_height):
     
     return output_pixels, m_tlast_count, m_tuser_count
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_gaussian_stage")
 async def test_gaussian_stage_reset(dut):
     """Test reset state"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -158,7 +159,7 @@ async def test_gaussian_stage_reset(dut):
     assert int(dut.m_tvalid.value) == 0, "m_tvalid should be 0 after reset"
     assert int(dut.s_tready.value) == 1, "s_tready should be 1 (ready)"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_gaussian_stage")
 async def test_gaussian_stage_valid_timing(dut):
     """Test that valid signal asserts after correct fill latency"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -195,7 +196,7 @@ async def test_gaussian_stage_valid_timing(dut):
     assert first_valid_cycle > 0, "Valid never asserted"
     dut._log.info(f"First valid at cycle {first_valid_cycle}, expected ~{expected_fill}")
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_gaussian_stage")
 async def test_gaussian_stage_backpressure(dut):
     """Test backpressure handling (m_tready = 0)"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -228,7 +229,7 @@ async def test_gaussian_stage_backpressure(dut):
     await RisingEdge(dut.clk)
     assert int(dut.s_tready.value) == 1, "s_tready should be 1 when m_tready is 1"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_gaussian_stage")
 async def test_gaussian_stage_small_frame(dut):
     """Test with a small frame (requires small IMG_WIDTH/HEIGHT for test)"""
     clock = Clock(dut.clk, 10, unit='ns')

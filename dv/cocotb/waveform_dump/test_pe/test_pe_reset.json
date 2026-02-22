@@ -1,0 +1,60 @@
+{
+  "test": "test_pe_reset",
+  "toplevel": "pe",
+  "clock": "clk",
+  "signals": [
+    "ACCUM_WIDTH",
+    "COEFF_WIDTH",
+    "PIXEL_WIDTH",
+    "acc_in",
+    "acc_out",
+    "acc_out_r",
+    "clear",
+    "clk",
+    "coeff",
+    "enable",
+    "pixel",
+    "product",
+    "product_ext",
+    "rst_n",
+    "sum"
+  ],
+  "samples": [
+    {
+      "cycle": 0,
+      "ACCUM_WIDTH": 24,
+      "COEFF_WIDTH": 8,
+      "PIXEL_WIDTH": 8,
+      "acc_in": 0,
+      "acc_out": 0,
+      "acc_out_r": 0,
+      "clear": 0,
+      "clk": 1,
+      "coeff": 0,
+      "enable": 0,
+      "pixel": 0,
+      "product": 0,
+      "product_ext": 0,
+      "rst_n": 0,
+      "sum": 0
+    },
+    {
+      "cycle": 1,
+      "ACCUM_WIDTH": 24,
+      "COEFF_WIDTH": 8,
+      "PIXEL_WIDTH": 8,
+      "acc_in": 0,
+      "acc_out": 0,
+      "acc_out_r": 0,
+      "clear": 0,
+      "clk": 1,
+      "coeff": 0,
+      "enable": 0,
+      "pixel": 0,
+      "product": 0,
+      "product_ext": 0,
+      "rst_n": 0,
+      "sum": 0
+    }
+  ]
+}

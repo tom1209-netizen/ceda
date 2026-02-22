@@ -1,6 +1,7 @@
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
+from tests.trace import traced_test
 import numpy as np
 import sys
 import os
@@ -32,7 +33,7 @@ def drive_rows(dut, col_values):
     dut.win_row_3.value = int(col_values[3])
     dut.win_row_4.value = int(col_values[4])
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_gaussian_5x5_core")
 async def test_gaussian_streaming(dut):
     """Test Gaussian core with streaming inputs against python reference"""
     clock = Clock(dut.clk, 10, unit='ns')
@@ -107,7 +108,7 @@ async def test_gaussian_streaming(dut):
         dut._log.error(f"First 10 actual:   {actual_outputs[:10]}")
         assert False, "Output sequence did not match expected convolution"
 
-@cocotb.test()
+@traced_test(trace_dir="waveform_dump/test_gaussian_5x5_core")
 async def test_impulse(dut):
     """Test impulse response (center pixel 255)"""
     clock = Clock(dut.clk, 10, unit='ns')

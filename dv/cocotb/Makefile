@@ -7,12 +7,18 @@ TESTCASE ?= test_gaussian_stage_small_frame
 NMS_TESTCASE ?=
 NMS_IMG_WIDTH ?= 20
 
-# Project paths
-RTL_DIR := ../../hw/rtl
-COMMON_DIR := $(RTL_DIR)/common
-GAUSSIAN_DIR := $(RTL_DIR)/gaussian
-NMS_DIR := $(RTL_DIR)/nms
-INC_DIR := $(RTL_DIR)/inc
+# Paths
+PWD_DIR = $(shell pwd)
+HW_DIR = $(PWD_DIR)/../../hw
+RTL_DIR = $(HW_DIR)/rtl
+COMMON_DIR = $(RTL_DIR)/common
+GAUSSIAN_DIR = $(RTL_DIR)/gaussian
+NMS_DIR = $(RTL_DIR)/nms
+INC_DIR = $(RTL_DIR)/inc
+
+# Default args for compilation
+# ModelSim uses SIM_ARGS, Verilator uses EXTRA_ARGS
+EXTRA_ARGS += $(COMPILE_ARGS) -Wno-fatal --trace
 
 # Python test path
 export PYTHONPATH := $(PWD)/models:$(PYTHONPATH)
@@ -46,14 +52,14 @@ all:
 		SIM=$(SIM) TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
 		VERILOG_SOURCES=$(COMMON_DIR)/line_buffer.v \
 		TOPLEVEL=line_buffer COCOTB_TEST_MODULES=tests.test_line_buffer \
-		COMPILE_ARGS="-Pline_buffer.LINE_WIDTH=32"
+		$(if $(filter modelsim,$(SIM)),SIM_ARGS="-gLINE_WIDTH=32",EXTRA_ARGS="-GLINE_WIDTH=32 -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC -Wno-fatal --trace")
 	@echo "=== Running Row Buffer Tests ==="
 	$(CLEAN_CMD)
 	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
 		SIM=$(SIM) TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
-		VERILOG_SOURCES="$(COMMON_DIR)/line_buffer.v $(GAUSSIAN_DIR)/row_buffer_5.v" \
-		TOPLEVEL=row_buffer_5 COCOTB_TEST_MODULES=tests.test_row_buffer_5 \
-		COMPILE_ARGS="-Prow_buffer_5.LINE_WIDTH=32"
+		VERILOG_SOURCES="$(COMMON_DIR)/line_buffer.v $(GAUSSIAN_DIR)/line_buffer_5.v" \
+		TOPLEVEL=line_buffer_5 COCOTB_TEST_MODULES=tests.test_row_buffer_5 \
+		$(if $(filter modelsim,$(SIM)),SIM_ARGS="-gIMG_WIDTH=32",EXTRA_ARGS="-GIMG_WIDTH=32 -Wno-fatal --trace")
 	@echo "=== Running Gaussian Core Tests ==="
 	$(CLEAN_CMD)
 	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
@@ -65,68 +71,80 @@ all:
 	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
 		SIM=$(SIM) TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
 		VERILOG_SOURCES="$(COMMON_DIR)/pe.v $(COMMON_DIR)/line_buffer.v \
-		                 $(GAUSSIAN_DIR)/row_buffer_5.v $(GAUSSIAN_DIR)/gaussian_5x5_core.v \
+		                 $(GAUSSIAN_DIR)/line_buffer_5.v $(GAUSSIAN_DIR)/gaussian_5x5_core.v \
 		                 $(GAUSSIAN_DIR)/gaussian_stage.v" \
 		TOPLEVEL=gaussian_stage COCOTB_TEST_MODULES=tests.test_gaussian_stage \
-		COMPILE_ARGS="-Pgaussian_stage.IMG_WIDTH=32 -Pgaussian_stage.IMG_HEIGHT=32"
+		$(if $(filter modelsim,$(SIM)),SIM_ARGS="-gIMG_WIDTH=32 -gIMG_HEIGHT=32",EXTRA_ARGS="-GIMG_WIDTH=32 -GIMG_HEIGHT=32 -Wno-fatal --trace")
 	@echo "=== All Tests Complete ==="
 
 # Individual Test Targets
 .PHONY: test_pe
 test_pe:
 	$(CLEAN_CMD)
-	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
+	WAVES=1 $(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
 		SIM=$(SIM) \
 		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
 		VERILOG_SOURCES=$(COMMON_DIR)/pe.v \
 		TOPLEVEL=pe \
-		COCOTB_TEST_MODULES=tests.test_pe
+		COCOTB_TEST_MODULES=tests.test_pe \
+		$(if $(filter verilator,$(SIM)),EXTRA_ARGS="-Wno-fatal --trace")
+	@mkdir -p waveform_dump/$@
+	@-vcd2wlf dump.vcd waveform_dump/$@/$@.wlf 2>/dev/null || true
 
 .PHONY: test_line_buffer
 test_line_buffer:
 	$(CLEAN_CMD)
-	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
+	WAVES=1 $(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
 		SIM=$(SIM) \
 		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
 		VERILOG_SOURCES=$(COMMON_DIR)/line_buffer.v \
 		TOPLEVEL=line_buffer \
 		COCOTB_TEST_MODULES=tests.test_line_buffer \
-		COMPILE_ARGS="-Pline_buffer.LINE_WIDTH=32"
+		$(if $(filter modelsim,$(SIM)),SIM_ARGS="-gLINE_WIDTH=32",EXTRA_ARGS="-GLINE_WIDTH=32 -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC -Wno-fatal --trace")
+	@mkdir -p waveform_dump/$@
+	@-vcd2wlf dump.vcd waveform_dump/$@/$@.wlf 2>/dev/null || true
 
 .PHONY: test_row_buffer
 test_row_buffer:
 	$(CLEAN_CMD)
-	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
+	WAVES=1 $(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
 		SIM=$(SIM) \
 		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
-		VERILOG_SOURCES="$(COMMON_DIR)/line_buffer.v $(GAUSSIAN_DIR)/row_buffer_5.v" \
-		TOPLEVEL=row_buffer_5 \
+		VERILOG_SOURCES="$(COMMON_DIR)/line_buffer.v $(GAUSSIAN_DIR)/line_buffer_5.v" \
+		TOPLEVEL=line_buffer_5 \
 		COCOTB_TEST_MODULES=tests.test_row_buffer_5 \
-		COMPILE_ARGS="-Prow_buffer_5.LINE_WIDTH=32"
+		$(if $(filter modelsim,$(SIM)),SIM_ARGS="-gIMG_WIDTH=32",EXTRA_ARGS="-GIMG_WIDTH=32 -Wno-fatal --trace")
+	@mkdir -p waveform_dump/$@
+	@-vcd2wlf dump.vcd waveform_dump/$@/$@.wlf 2>/dev/null || true
 
 .PHONY: test_gaussian_core
 test_gaussian_core:
 	$(CLEAN_CMD)
-	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
+	WAVES=1 $(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
 		SIM=$(SIM) \
 		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
 		VERILOG_SOURCES="$(COMMON_DIR)/pe.v $(GAUSSIAN_DIR)/gaussian_5x5_core.v" \
 		TOPLEVEL=gaussian_5x5_core \
-		COCOTB_TEST_MODULES=tests.test_gaussian_5x5_core
+		COCOTB_TEST_MODULES=tests.test_gaussian_5x5_core \
+		$(if $(filter verilator,$(SIM)),EXTRA_ARGS="-Wno-fatal --trace")
+	@mkdir -p waveform_dump/$@
+	@-vcd2wlf dump.vcd waveform_dump/$@/$@.wlf 2>/dev/null || true
 
 .PHONY: test_gaussian_stage
 test_gaussian_stage:
-	$(CLEAN_CMD)
-	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
+	rm -rf sim_build results.xml
+	WAVES=1 $(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
 		SIM=$(SIM) \
 		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
 		VERILOG_SOURCES="$(COMMON_DIR)/pe.v $(COMMON_DIR)/line_buffer.v \
-		                 $(GAUSSIAN_DIR)/row_buffer_5.v $(GAUSSIAN_DIR)/gaussian_5x5_core.v \
+		                 $(GAUSSIAN_DIR)/line_buffer_5.v $(GAUSSIAN_DIR)/gaussian_5x5_core.v \
 		                 $(GAUSSIAN_DIR)/gaussian_stage.v" \
 		TOPLEVEL=gaussian_stage \
 		COCOTB_TEST_MODULES=tests.test_gaussian_stage \
 		COCOTB_TESTCASE=$(TESTCASE) \
-		SIM_ARGS="-GIMG_WIDTH=5 -GIMG_HEIGHT=5"
+		$(if $(filter modelsim,$(SIM)),SIM_ARGS="-gIMG_WIDTH=5 -gIMG_HEIGHT=5",EXTRA_ARGS="-GIMG_WIDTH=5 -GIMG_HEIGHT=5 -Wno-fatal --trace")
+	@mkdir -p waveform_dump/$@
+	@-vcd2wlf dump.vcd waveform_dump/$@/$@.wlf 2>/dev/null || true
 
 .PHONY: test_gaussian_stage_1080p
 test_gaussian_stage_1080p:
@@ -135,23 +153,25 @@ test_gaussian_stage_1080p:
 		SIM=$(SIM) \
 		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
 		VERILOG_SOURCES="$(COMMON_DIR)/pe.v $(COMMON_DIR)/line_buffer.v \
-		                 $(GAUSSIAN_DIR)/row_buffer_5.v $(GAUSSIAN_DIR)/gaussian_5x5_core.v \
+		                 $(GAUSSIAN_DIR)/line_buffer_5.v $(GAUSSIAN_DIR)/gaussian_5x5_core.v \
 		                 $(GAUSSIAN_DIR)/gaussian_stage.v" \
 		TOPLEVEL=gaussian_stage \
 		COCOTB_TEST_MODULES=tests.test_gaussian_real_image \
-		SIM_ARGS="-GIMG_WIDTH=1920 -GIMG_HEIGHT=1080"
+		$(if $(filter modelsim,$(SIM)),SIM_ARGS="-gIMG_WIDTH=1920 -gIMG_HEIGHT=1080",EXTRA_ARGS="-GIMG_WIDTH=1920 -GIMG_HEIGHT=1080 -Wno-fatal")
 
 .PHONY: test_nms
 test_nms:
 	$(CLEAN_CMD)
-	$(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
+	WAVES=1 $(MAKE) -f $(shell cocotb-config --makefiles)/Makefile.sim \
 		SIM=$(SIM) \
 		TOPLEVEL_LANG=$(TOPLEVEL_LANG) \
         VERILOG_SOURCES="$(COMMON_DIR)/line_buffer.v $(NMS_DIR)/row_buffer_3.v $(NMS_DIR)/nms_core.v $(NMS_DIR)/nms_stage.v" \
         TOPLEVEL=nms_stage \
         COCOTB_TEST_MODULES=tests.test_nms \
         COCOTB_TESTCASE=$(NMS_TESTCASE) \
-        SIM_ARGS="-GIMG_WIDTH=$(NMS_IMG_WIDTH)"
+        $(if $(filter modelsim,$(SIM)),SIM_ARGS="-gIMG_WIDTH=$(NMS_IMG_WIDTH)",EXTRA_ARGS="-GIMG_WIDTH=$(NMS_IMG_WIDTH) -Wno-fatal --trace")
+	@mkdir -p waveform_dump/$@
+	@-vcd2wlf dump.vcd waveform_dump/$@/$@.wlf 2>/dev/null || true
 
 # Clean
 .PHONY: clean
