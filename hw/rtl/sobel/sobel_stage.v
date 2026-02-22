@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 module sobel_stage #(
     parameter IMG_WIDTH  = 128,
     parameter IMG_HEIGHT = 128
@@ -10,12 +12,15 @@ module sobel_stage #(
     input  wire           s_axis_tvalid,
     output wire           s_axis_tready,
     input  wire           s_axis_tlast,
+    input  wire           s_axis_tuser,
     
     // Outputs
-    output reg [14:0]     m_axis_tdata,
+    output reg [15:0]     m_axis_tdata,
     output reg            m_axis_tvalid,
     input  wire           m_axis_tready,
-    output reg            m_axis_tlast
+    output wire           m_axis_tlast,
+    output wire           m_axis_tuser,
+    output wire           m_axis_teof
 );
 
     reg [7:0]      m_axis_gx_tdata;
@@ -43,7 +48,7 @@ module sobel_stage #(
     wire lb_write_en = (s_axis_tvalid && s_axis_tready) || 
                        (flush_active && downstream_ready && !input_paused);
 
-    line_buffer #(
+    line_buffer_sobel #(
         .DATA_WIDTH(8),
         .IMG_WIDTH(IMG_WIDTH)
     ) lb_inst (
@@ -202,33 +207,33 @@ module sobel_stage #(
 
     // --- GX KERNEL ---
     // Row 0 (Top Window)
-    pe #(.WEIGHT(-1)) pe_gx_00 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(col0_gx_valid), .y_in(16'sd0), .x_in(w_top_row), .y_out(r0_p0_gx));
-    pe #(.WEIGHT( 0)) pe_gx_01 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gx_valid), .output_valid(col1_gx_valid), .y_in(r0_p0_gx), .x_in(w_top_row), .y_out(r0_p1_gx));
-    pe #(.WEIGHT( 1)) pe_gx_02 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gx_valid), .output_valid(col2_gx_valid), .y_in(r0_p1_gx), .x_in(w_top_row), .y_out(r0_p2_gx));
+    pe_sobel #(.WEIGHT(-1)) pe_gx_00 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(col0_gx_valid), .y_in(16'sd0), .x_in(w_top_row), .y_out(r0_p0_gx));
+    pe_sobel #(.WEIGHT( 0)) pe_gx_01 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gx_valid), .output_valid(col1_gx_valid), .y_in(r0_p0_gx), .x_in(w_top_row), .y_out(r0_p1_gx));
+    pe_sobel #(.WEIGHT( 1)) pe_gx_02 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gx_valid), .output_valid(col2_gx_valid), .y_in(r0_p1_gx), .x_in(w_top_row), .y_out(r0_p2_gx));
 
     // Row 1 (Mid Window)
-    pe #(.WEIGHT(-2)) pe_gx_10 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(),             .y_in(16'sd0), .x_in(w_mid_row), .y_out(r1_p0_gx));
-    pe #(.WEIGHT( 0)) pe_gx_11 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gx_valid), .output_valid(),             .y_in(r1_p0_gx), .x_in(w_mid_row), .y_out(r1_p1_gx));
-    pe #(.WEIGHT( 2)) pe_gx_12 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gx_valid), .output_valid(),             .y_in(r1_p1_gx), .x_in(w_mid_row), .y_out(r1_p2_gx));
+    pe_sobel #(.WEIGHT(-2)) pe_gx_10 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(),             .y_in(16'sd0), .x_in(w_mid_row), .y_out(r1_p0_gx));
+    pe_sobel #(.WEIGHT( 0)) pe_gx_11 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gx_valid), .output_valid(),             .y_in(r1_p0_gx), .x_in(w_mid_row), .y_out(r1_p1_gx));
+    pe_sobel #(.WEIGHT( 2)) pe_gx_12 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gx_valid), .output_valid(),             .y_in(r1_p1_gx), .x_in(w_mid_row), .y_out(r1_p2_gx));
 
     // Row 2 (Bot Window)
-    pe #(.WEIGHT(-1)) pe_gx_20 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(),             .y_in(16'sd0), .x_in(w_bot_row), .y_out(r2_p0_gx));
-    pe #(.WEIGHT( 0)) pe_gx_21 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gx_valid), .output_valid(),             .y_in(r2_p0_gx), .x_in(w_bot_row), .y_out(r2_p1_gx));
-    pe #(.WEIGHT( 1)) pe_gx_22 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gx_valid), .output_valid(),             .y_in(r2_p1_gx), .x_in(w_bot_row), .y_out(r2_p2_gx));
+    pe_sobel #(.WEIGHT(-1)) pe_gx_20 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(),             .y_in(16'sd0), .x_in(w_bot_row), .y_out(r2_p0_gx));
+    pe_sobel #(.WEIGHT( 0)) pe_gx_21 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gx_valid), .output_valid(),             .y_in(r2_p0_gx), .x_in(w_bot_row), .y_out(r2_p1_gx));
+    pe_sobel #(.WEIGHT( 1)) pe_gx_22 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gx_valid), .output_valid(),             .y_in(r2_p1_gx), .x_in(w_bot_row), .y_out(r2_p2_gx));
 
     // --- GY KERNEL (Same Logic) ---
     // Row 0
-    pe #(.WEIGHT(-1)) pe_gy_00 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(col0_gy_valid), .y_in(16'sd0), .x_in(w_top_row), .y_out(r0_p0_gy));
-    pe #(.WEIGHT(-2)) pe_gy_01 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gy_valid), .output_valid(col1_gy_valid), .y_in(r0_p0_gy), .x_in(w_top_row), .y_out(r0_p1_gy));
-    pe #(.WEIGHT(-1)) pe_gy_02 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gy_valid), .output_valid(col2_gy_valid), .y_in(r0_p1_gy), .x_in(w_top_row), .y_out(r0_p2_gy));
+    pe_sobel #(.WEIGHT(-1)) pe_gy_00 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(col0_gy_valid), .y_in(16'sd0), .x_in(w_top_row), .y_out(r0_p0_gy));
+    pe_sobel #(.WEIGHT(-2)) pe_gy_01 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gy_valid), .output_valid(col1_gy_valid), .y_in(r0_p0_gy), .x_in(w_top_row), .y_out(r0_p1_gy));
+    pe_sobel #(.WEIGHT(-1)) pe_gy_02 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gy_valid), .output_valid(col2_gy_valid), .y_in(r0_p1_gy), .x_in(w_top_row), .y_out(r0_p2_gy));
     // Row 1
-    pe #(.WEIGHT( 0)) pe_gy_10 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(),              .y_in(16'sd0), .x_in(w_mid_row), .y_out(r1_p0_gy));
-    pe #(.WEIGHT( 0)) pe_gy_11 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gy_valid), .output_valid(),              .y_in(r1_p0_gy), .x_in(w_mid_row), .y_out(r1_p1_gy));
-    pe #(.WEIGHT( 0)) pe_gy_12 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gy_valid), .output_valid(),              .y_in(r1_p1_gy), .x_in(w_mid_row), .y_out(r1_p2_gy));
+    pe_sobel #(.WEIGHT( 0)) pe_gy_10 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(),              .y_in(16'sd0), .x_in(w_mid_row), .y_out(r1_p0_gy));
+    pe_sobel #(.WEIGHT( 0)) pe_gy_11 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gy_valid), .output_valid(),              .y_in(r1_p0_gy), .x_in(w_mid_row), .y_out(r1_p1_gy));
+    pe_sobel #(.WEIGHT( 0)) pe_gy_12 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gy_valid), .output_valid(),              .y_in(r1_p1_gy), .x_in(w_mid_row), .y_out(r1_p2_gy));
     // Row 2
-    pe #(.WEIGHT( 1)) pe_gy_20 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(),              .y_in(16'sd0), .x_in(w_bot_row), .y_out(r2_p0_gy));
-    pe #(.WEIGHT( 2)) pe_gy_21 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gy_valid), .output_valid(),              .y_in(r2_p0_gy), .x_in(w_bot_row), .y_out(r2_p1_gy));
-    pe #(.WEIGHT( 1)) pe_gy_22 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gy_valid), .output_valid(),              .y_in(r2_p1_gy), .x_in(w_bot_row), .y_out(r2_p2_gy));
+    pe_sobel #(.WEIGHT( 1)) pe_gy_20 (.clk(clk), .rst_n(resetn), .compute_valid(compute_pulse), .output_valid(),              .y_in(16'sd0), .x_in(w_bot_row), .y_out(r2_p0_gy));
+    pe_sobel #(.WEIGHT( 2)) pe_gy_21 (.clk(clk), .rst_n(resetn), .compute_valid(col0_gy_valid), .output_valid(),              .y_in(r2_p0_gy), .x_in(w_bot_row), .y_out(r2_p1_gy));
+    pe_sobel #(.WEIGHT( 1)) pe_gy_22 (.clk(clk), .rst_n(resetn), .compute_valid(col1_gy_valid), .output_valid(),              .y_in(r2_p1_gy), .x_in(w_bot_row), .y_out(r2_p2_gy));
 
     // -------------------------------------------------------------------------
     // Output Summation & Formatting
@@ -305,7 +310,10 @@ module sobel_stage #(
     // -------------------------------------------------------------------------
     
     reg [31:0] out_pixel_count = 0;
-    
+    reg [31:0] col_pixel_count = 0;
+    assign m_axis_tlast = (col_pixel_count == IMG_WIDTH - 1);
+    assign m_axis_tuser = (out_pixel_count == 0 && m_axis_tvalid);
+    assign m_axis_teof  = (out_pixel_count == TOTAL_PIXELS - 1);
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             m_axis_gx_tdata  <= 0;
@@ -318,22 +326,38 @@ module sobel_stage #(
             if (col2_gx_valid && boundary_mask) begin
                 m_axis_gx_tdata  <= (abs_sum_gx > 255) ? 8'd255 : abs_sum_gx[7:0]; 
                 m_axis_gy_tdata  <= (abs_sum_gy > 255) ? 8'd255 : abs_sum_gy[7:0]; 
-                m_axis_tdata     <= {gradient_direction, (combined_magnitude > 255) ? 12'd255 : combined_magnitude};
+                m_axis_tdata     <= {1'b0, gradient_direction, (combined_magnitude > 255) ? 12'd255 : combined_magnitude};
                 
                 m_axis_gx_tvalid <= 1'b1;
                 m_axis_gy_tvalid <= 1'b1;
                 m_axis_tvalid    <= 1'b1;
                 
-                out_pixel_count <= out_pixel_count + 1;
-                if (out_pixel_count == TOTAL_PIXELS - 1)
-                    m_axis_tlast <= 1'b1;
             end else begin
                 m_axis_gx_tvalid <= 1'b0;
                 m_axis_gy_tvalid <= 1'b0;
                 m_axis_tvalid    <= 1'b0;
                 
-                m_axis_tlast <= 1'b0;
+    
             end
+        end
+    end
+    
+    always @(posedge clk or negedge resetn)
+    begin
+        if (!resetn)
+        begin
+            out_pixel_count <= 0;
+            col_pixel_count <= 0;
+        end
+        else if (m_axis_tvalid && m_axis_tready)
+        begin
+            col_pixel_count <= col_pixel_count + 1;
+            if (col_pixel_count == IMG_WIDTH - 1)
+                col_pixel_count <= 1'b0;
+                            
+            out_pixel_count <= out_pixel_count + 1;
+            if (out_pixel_count == TOTAL_PIXELS - 1)
+                out_pixel_count <= 1'b0;
         end
     end
 
