@@ -808,21 +808,27 @@ Projected resource usage on Xilinx XC7Z020:
 ## 9. Experimental Filter Outputs
 
 <p align="center">
-  <img src="./dv/cocotb/tests/test_output/image_out_gaus.png" alt="Gaussian Stage">
+  <img src="./dv/cocotb/tests/test_output/image_in.png" alt="Input">
   <br>
-  <i>Figure 1: Output after applying the Gaussian Blur filter.</i>
+  <i>Figure 1: Input Grayscale image.</i>
 </p>
 
 <p align="center">
-  <img src="./dv/cocotb/tests/test_output/image_out_gaus_sobel_mag.png" alt="Sobel Stage">
+  <img src="./dv/cocotb/tests/test_output/image_out_gaus.png" alt="Gaussian Stage">
   <br>
-  <i>Figure 2: Gradient magnitude calculated by the Sobel operator.</i>
+  <i>Figure 2: Output after applying the Gaussian Blur filter.</i>
+</p>
+
+<p align="center">
+  <img src="./dv/cocotb/tests/test_output/image_out_gaus_sobel.png" alt="Sobel Stage">
+  <br>
+  <i>Figure 3: Gradient magnitude calculated by the Sobel operator.</i>
 </p>
 
 <p align="center">
   <img src="./dv/cocotb/tests/test_output/image_out_canny.png" alt="NMS Stage">
   <br>
-  <i>Figure 3: Final edges after Non-Maximum Suppression (NMS).</i>
+  <i>Figure 4: Final edges after Non-Maximum Suppression (NMS).</i>
 </p>
 
 ## 10. References
