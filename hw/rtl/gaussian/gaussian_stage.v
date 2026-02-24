@@ -27,14 +27,18 @@ module gaussian_stage #(
 
     reg input_paused;
     reg flush_active;
+    
+    // A pipeline stalls ONLY if it has valid data to send, but downstream isn't ready.
+    wire stall = m_tvalid && !m_tready;
+    wire pipeline_en = !stall;
 
-    assign s_tready = downstream_ready && !input_paused && !flush_active;
+    assign s_tready = pipeline_en && !input_paused && !flush_active;
 
     wire [7:0] lb_row0, lb_row1, lb_row2, lb_row3, lb_row4;
     wire lb_std_valid;
 
     wire lb_write_en = (s_tvalid && s_tready) || 
-                       (flush_active && downstream_ready && !input_paused);
+                       (flush_active && pipeline_en && !input_paused);
 
     line_buffer_5 #(
         .DATA_WIDTH(8),
@@ -73,7 +77,8 @@ module gaussian_stage #(
 
     // We consider warmup_done when we have filled exactly 2 lines minus 1 pixel
     wire start_condition = warmup_done && ((s_tvalid && s_tready) || flush_active || h_state != S_ACTIVE);
-    wire compute_pulse = start_condition && downstream_ready;
+//    wire start_condition = warmup_done && ((s_tvalid && s_tready) || flush_active || input_paused);
+    wire compute_pulse = start_condition && pipeline_en;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -204,7 +209,7 @@ module gaussian_stage #(
     ) core_inst (
         .clk(clk),
         .rst_n(rst_n),
-        .enable(downstream_ready),
+        .enable(compute_pulse),
         .valid_in(compute_pulse),
 
         .win_row_0(w_row0),
@@ -236,7 +241,7 @@ module gaussian_stage #(
             m_tuser         <= 0;
             compute_col     <= 0;
             out_pixel_count <= 0;
-        end else if (downstream_ready) begin
+        end else if (pipeline_en) begin
 
             // 1) Track absolute compute cycle per row
             if (compute_pulse) begin
@@ -270,7 +275,13 @@ module gaussian_stage #(
                     m_tlast  <= 1'b0;
                     m_tuser  <= 1'b0;
                 end
+            end else begin
+                // <--- NEW: Clear tvalid when pipeline is starved but downstream is ready
+                m_tvalid <= 1'b0;
+                m_tlast  <= 1'b0;
+                m_tuser  <= 1'b0;
             end
+            
 
         end
     end

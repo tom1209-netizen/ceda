@@ -38,7 +38,11 @@ module sobel_stage #(
     reg input_paused; 
     reg flush_active = 0;
     
-    assign s_axis_tready = downstream_ready && !input_paused && !flush_active;
+    // A pipeline stalls ONLY if it has valid data to send, but downstream isn't ready.
+    wire stall = m_axis_tvalid && !m_axis_tready;
+    wire pipeline_en = !stall;
+    
+    assign s_axis_tready = pipeline_en && !input_paused && !flush_active;
 
   
     wire [7:0] lb_top, lb_mid, lb_bot; 
@@ -46,7 +50,7 @@ module sobel_stage #(
     
 
     wire lb_write_en = (s_axis_tvalid && s_axis_tready) || 
-                       (flush_active && downstream_ready && !input_paused);
+                       (flush_active && pipeline_en && !input_paused);
 
     line_buffer_sobel #(
         .DATA_WIDTH(8),
@@ -77,8 +81,14 @@ module sobel_stage #(
     reg [31:0] global_pixel_cnt;
     reg        warmup_done; 
     reg [11:0] y_cnt;
-    wire start_condition = warmup_done && ((s_axis_tvalid && s_axis_tready) || flush_active || h_state != S_ACTIVE);
-    wire compute_pulse   = start_condition && downstream_ready;
+//    wire start_condition = warmup_done && ((s_axis_tvalid && s_axis_tready) || flush_active || h_state != S_ACTIVE);
+//    wire compute_pulse   = start_condition && downstream_ready;
+    // Compute pulse waits for valid upstream data (or a flush) before advancing
+    wire start_condition = warmup_done && (s_axis_tvalid || flush_active);
+    wire compute_pulse   = start_condition && pipeline_en;
+
+
+
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             global_pixel_cnt <= 0;
@@ -97,7 +107,7 @@ module sobel_stage #(
             begin
                     flush_active <= 1'b1;
             end
-            if (flush_active && h_state == S_PAD_RIGHT && y_cnt == IMG_HEIGHT - 1 && compute_pulse) begin
+            if (flush_active && h_state == S_PAD_RIGHT && y_cnt == IMG_HEIGHT && compute_pulse) begin
                 flush_active <= 1'b0;
             end
         end    
@@ -128,9 +138,11 @@ module sobel_stage #(
                     end
 
                     S_PAD_LEFT: begin
+                    if (s_axis_tvalid || flush_active) begin
                         input_paused <= 1'b0; // Unpause for next cycle (Active)
                         h_state      <= S_ACTIVE;
                         h_cnt        <= 0;
+                    end
                     end
                     
                     S_ACTIVE: begin
@@ -311,6 +323,7 @@ module sobel_stage #(
     
     reg [31:0] out_pixel_count = 0;
     reg [31:0] col_pixel_count = 0;
+    reg [31:0] col2_pixel_count = 0;
     assign m_axis_tlast = (col_pixel_count == IMG_WIDTH - 1);
     assign m_axis_tuser = (out_pixel_count == 0 && m_axis_tvalid);
     assign m_axis_teof  = (out_pixel_count == TOTAL_PIXELS - 1);
@@ -322,8 +335,8 @@ module sobel_stage #(
             m_axis_gy_tvalid <= 0;
             m_axis_tdata     <= 0;
             m_axis_tvalid    <= 0;
-        end else begin
-            if (col2_gx_valid && boundary_mask) begin
+        end else if (pipeline_en) begin
+            if (col2_gx_valid && col0_gx_valid && boundary_mask) begin
                 m_axis_gx_tdata  <= (abs_sum_gx > 255) ? 8'd255 : abs_sum_gx[7:0]; 
                 m_axis_gy_tdata  <= (abs_sum_gy > 255) ? 8'd255 : abs_sum_gy[7:0]; 
                 m_axis_tdata     <= {1'b0, gradient_direction, (combined_magnitude > 255) ? 12'd255 : combined_magnitude};
@@ -331,6 +344,12 @@ module sobel_stage #(
                 m_axis_gx_tvalid <= 1'b1;
                 m_axis_gy_tvalid <= 1'b1;
                 m_axis_tvalid    <= 1'b1;
+                
+//                col2_pixel_count <= col2_pixel_count + 1;
+//                if (col2_pixel_count == IMG_WIDTH)
+//                begin
+//                    col2_pixel_count <= 0;
+//                end
                 
             end else begin
                 m_axis_gx_tvalid <= 1'b0;
