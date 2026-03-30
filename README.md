@@ -596,13 +596,13 @@ $$\text{thresh}_{\text{high}} = \text{thresh}_{\text{low}} + (\lvert G_x \rvert 
 | Output | Direction | Used for NMS comparison |
 | ------ | --------- | ----------------------- |
 | 3'b000 | 0°        | Compare East-West       |
-| 3'b001 | 22.5°     | Compare NE-SW           |
-| 3'b010 | 45°       | Compare NE-SW           |
-| 3'b011 | 67.5°     | Compare North-South     |
-| 3'b100 | 90°       | Compare North-South     |
-| 3'b101 | 112.5°    | Compare NW-SE           |
-| 3'b110 | 135°      | Compare NW-SE           |
-| 3'b111 | 157.5°    | Compare East-West       |
+| 3'b001 | 45°       | Compare NE-SW           |
+| 3'b010 | 90°       | Compare North-South     |
+| 3'b011 | 135°      | Compare NW-SE           |
+| 3'b100 | 180°      | Compare East-West       |
+| 3'b101 | 225°      | Compare NE-SW           |
+| 3'b110 | 270°      | Compare North-South     |
+| 3'b111 | 315°      | Compare NW-SE           |
 
 
 ## 5. Non-Maximum Suppression (NMS) Stage
@@ -686,10 +686,10 @@ else:
 
 | Direction | Angle    | Neighbor 1 | Neighbor 2 |
 | --------- | -------- | ---------- | ---------- |
-| 0, 7      | 0°, 180° | p11-1 (W)  | p11+1 (E)  |
-| 1, 2      | 45°      | p00 (NW)   | p22 (SE)   |
-| 3, 4      | 90°      | p01 (N)    | p21 (S)    |
-| 5, 6      | 135°     | p02 (NE)   | p20 (SW)   |
+| 0, 4      | 0°, 180° | p10 (W)    | p12 (E)    |
+| 1, 5      | 45°      | p02 (NE)   | p20 (SW)   |
+| 2, 6      | 90°      | p01 (N)    | p21 (S)    |
+| 3, 7      | 135°     | p00 (NW)   | p22 (SE)   |
 
 ## 6. Thresholding Stage
 
